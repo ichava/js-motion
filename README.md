@@ -1,4 +1,4 @@
-# @ichava/motion
+# @ichava/js-motion
 
 A **framework-agnostic**, JSON-driven **SVG / icon animation engine**. Vanilla, **zero runtime
 dependencies**, self-contained (JS + CSS). Works in any project (React, Vue, plain HTML) via a
@@ -20,9 +20,9 @@ Lottie** tier.
 npm / CDN:
 
 ```js
-import IchavaMotion from '@ichava/motion';
-import '@ichava/motion/css';
-// or unpkg: https://unpkg.com/@ichava/motion/dist/ichava-motion.js
+import IchavaMotion from '@ichava/js-motion';
+import '@ichava/js-motion/css';
+// or unpkg: https://unpkg.com/@ichava/js-motion/dist/ichava-motion.js
 ```
 
 ## Three ways to animate

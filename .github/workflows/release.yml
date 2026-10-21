@@ -112,7 +112,7 @@ jobs:
             echo 'body<<CHANGELOG_EOF'
             printf '%s\n' "$SECTION"
             echo ''
-            echo "**Full changelog:** https://github.com/ichava/motion/blob/main/CHANGELOG.md"
+            echo "**Full changelog:** https://github.com/ichava/js-motion/blob/main/CHANGELOG.md"
             echo 'CHANGELOG_EOF'
           } >> "$GITHUB_OUTPUT"
 

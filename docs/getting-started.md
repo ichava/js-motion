@@ -21,7 +21,7 @@ The engine does **not** scan the document on load. Nothing animates because a sc
 you ask for it:
 
 ```js
-import { init } from '@ichava/motion'
+import { init } from '@ichava/js-motion'
 
 init()
 ```
@@ -35,7 +35,7 @@ adopt incrementally and impossible to debug.
 each. `spin`, `spin-subtle`, `spin-bold-reverse` are all the same family at different intensities.
 
 ```js
-import presets from '@ichava/motion/presets'
+import presets from '@ichava/js-motion/presets'
 
 presets.presets.filter(p => p.family === 'spin')
 ```

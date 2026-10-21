@@ -11,7 +11,7 @@ implicit import.
 ## Using it
 
 ```js
-import { mountLottie } from '@ichava/motion/lottie'
+import { mountLottie } from '@ichava/js-motion/lottie'
 ```
 
 The adapter looks for a Lottie runtime on `window.lottie`, or the bundled global

@@ -2,6 +2,12 @@
 
 All notable changes to `@ichava/motion` follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking: the package is `@ichava/js-motion`**, following the repository rename from `ichava/motion`. Imports change from `@ichava/motion` (and its `/css`, `/scss`, `/presets`, `/lottie` subpaths) to `@ichava/js-motion`. Releases up to and including v0.1.2 keep the old name, so consumers pinned to them are unaffected until they move to the next tag. The `dist/ichava-motion.*` file names and the `.ichm-*` classes are unchanged.
+
 ## [0.1.2] - 2026-09-22
 
 ### Added

@@ -11,6 +11,6 @@ Acknowledgement within 48 hours.
 
 ## Scope for this package
 
-`@ichava/motion` runs in the browser and ships no runtime dependencies. The surface worth reporting
+`@ichava/js-motion` runs in the browser and ships no runtime dependencies. The surface worth reporting
 is animation configuration reaching the DOM from untrusted input, and the Lottie adapter, which
 executes third-party animation data through a runtime the host supplies.

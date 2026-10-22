@@ -74,7 +74,7 @@ The manifest is published as a subpath export precisely so a UI can enumerate it
 CSS:
 
 ```js
-import manifest from '@ichava/motion/presets'
+import manifest from '@ichava/js-motion/presets'
 
 const families = [...new Set(manifest.presets.map(p => p.family))]
 ```

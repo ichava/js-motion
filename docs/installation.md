@@ -4,7 +4,7 @@
 
 *How-to guide.*
 
-`@ichava/motion` is **not published to npm** (decision `Q4` in the ecosystem audit). Install it from
+`@ichava/js-motion` is **not published to npm** (decision `Q4` in the ecosystem audit). Install it from
 the repository, or vendor the built files.
 
 ## From the repository
@@ -12,7 +12,7 @@ the repository, or vendor the built files.
 ```json
 {
     "dependencies": {
-        "@ichava/motion": "github:ichava/motion#v0.1.0"
+        "@ichava/js-motion": "github:ichava/js-motion#v0.1.0"
     }
 }
 ```
@@ -32,12 +32,12 @@ The IIFE build assigns a global and needs nothing else:
 
 | Entry | File | Use |
 |---|---|---|
-| `@ichava/motion` | `dist/ichava-motion.mjs` | ESM, the default for a bundler |
-| `@ichava/motion` | `dist/ichava-motion.cjs` | CommonJS |
-| `@ichava/motion/css` | `dist/ichava-motion.css` | the keyframes and `.ichm-*` classes |
-| `@ichava/motion/scss` | `src/ichava-motion.scss` | the source, if you compile your own |
-| `@ichava/motion/presets` | `dist/presets.json` | the preset manifest, for building a picker |
-| `@ichava/motion/lottie` | the Lottie adapter | opt-in, see [lottie.md](lottie.md) |
+| `@ichava/js-motion` | `dist/ichava-motion.mjs` | ESM, the default for a bundler |
+| `@ichava/js-motion` | `dist/ichava-motion.cjs` | CommonJS |
+| `@ichava/js-motion/css` | `dist/ichava-motion.css` | the keyframes and `.ichm-*` classes |
+| `@ichava/js-motion/scss` | `src/ichava-motion.scss` | the source, if you compile your own |
+| `@ichava/js-motion/presets` | `dist/presets.json` | the preset manifest, for building a picker |
+| `@ichava/js-motion/lottie` | the Lottie adapter | opt-in, see [lottie.md](lottie.md) |
 
 **Zero runtime dependencies.** The Lottie adapter is the only thing that expects anything external,
 and it is opt-in precisely so the core stays that way.

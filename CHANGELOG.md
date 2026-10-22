@@ -2,6 +2,14 @@
 
 All notable changes to `@ichava/motion` follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **`dist/` rebuilt with Vite 8.3.5.** The bundler now writes `// src/ichava-motion.js` where it wrote `//#region` markers. Only comment lines change in `ichava-motion.{js,mjs,cjs}`, but the build-output guard compares bytes.
+- **CI runs on Node 22 and 24.** The Node 20 lane could no longer install: npm 10 fails with `Cannot read properties of null (reading 'edgesOut')`. The shipped library is browser code with no runtime dependencies, so this only affects the dev toolchain.
+- **Breaking: the package is `@ichava/js-motion`**, following the repository rename from `ichava/motion`. Imports change from `@ichava/motion` (and its `/css`, `/scss`, `/presets`, `/lottie` subpaths) to `@ichava/js-motion`. Releases up to and including v0.1.2 keep the old name, so consumers pinned to them are unaffected until they move to the next tag. The `dist/ichava-motion.*` file names and the `.ichm-*` classes are unchanged.
+
 ## [0.1.2] - 2026-09-22
 
 ### Added

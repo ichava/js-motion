@@ -1,4 +1,4 @@
-//#region src/ichava-motion.js
+// src/ichava-motion.js
 var VERSION = "1.0.0";
 var EASINGS = {
 	linear: "linear",
@@ -873,7 +873,6 @@ IchavaMotion.autoInit = function autoInit() {
 	else auto();
 	return IchavaMotion;
 };
-//#endregion
 export { IchavaMotion as default };
 
 //# sourceMappingURL=ichava-motion.mjs.map

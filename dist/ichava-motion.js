@@ -1,6 +1,6 @@
 "use strict";
 var IchavaMotion = (function() {
-	//#region src/ichava-motion.js
+	// src/ichava-motion.js
 	var VERSION = "1.0.0";
 	var EASINGS = {
 		linear: "linear",
@@ -875,7 +875,6 @@ var IchavaMotion = (function() {
 		else auto();
 		return IchavaMotion;
 	};
-	//#endregion
 	return IchavaMotion;
 })();
 

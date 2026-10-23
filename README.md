@@ -32,7 +32,7 @@ import '@ichava/js-motion/css';
 ```html
 <svg class="ichm-spin">…</svg>   <!-- or .ichm-pulse .ichm-bounce .ichm-heartbeat … -->
 ```
-Tune with CSS vars: `--ichm-duration`, `--ichm-easing`, `--ichm-iterations` (globally or per element).
+Tune with CSS vars: `--ichm-duration`, `--ichm-easing`, `--ichm-iterations` (globally or per element), and `--ichm-glow-color` for the glow family (the icon's own colour when unset; set it to your accent to make the glow follow it).
 
 **2 · Declarative JS**: `data-*` on the element; `IchavaMotion.auto()` runs on load:
 

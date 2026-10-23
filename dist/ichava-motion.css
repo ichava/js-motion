@@ -260,10 +260,10 @@
 }
 @keyframes ichm-glow {
   0%, 100% {
-    filter: drop-shadow(0 0 0 currentColor);
+    filter: drop-shadow(0 0 0 var(--ichm-glow-color, currentColor));
   }
   50% {
-    filter: drop-shadow(0 0 5px currentColor);
+    filter: drop-shadow(0 0 5px var(--ichm-glow-color, currentColor));
   }
 }
 @keyframes ichm-tada {

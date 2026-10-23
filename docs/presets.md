@@ -82,6 +82,14 @@ const families = [...new Set(manifest.presets.map(p => p.family))]
 Remember the two sentinels: `manifest.count` is 242 because it includes `None` and `JSON · Custom`,
 which a picker should offer but which are not animations.
 
+## Glow colour
+
+The glow family's shadow is `var(--ichm-glow-color, currentColor)`, in the JS presets and the CSS tier alike: the icon's own colour unless a container sets `--ichm-glow-color`. To make it follow a brand accent:
+
+```css
+.my-app { --ichm-glow-color: var(--accent); }
+```
+
 ## Listing the families and variants
 
 `IchavaMotion.catalog()` returns the families and variants the registry is generated from, as typed copies (`MotionCatalog`). Every preset is one family in one variant, so a picker can group presets by family without keeping its own tables:

@@ -21,6 +21,7 @@ function createMotion() {
 		return "ease-in-out";
 	}
 	var P = "perspective(400px)";
+	var GLOW = "var(--ichm-glow-color, currentColor)";
 	var VARIANTS = [
 		{
 			s: "",
@@ -213,6 +214,7 @@ function createMotion() {
 					{ transform: "scale(1,1)" },
 					{ transform: "scale(" + (1 + .25 * a) + "," + (1 - .25 * a) + ")" },
 					{ transform: "scale(" + (1 - .15 * a) + "," + (1 + .15 * a) + ")" },
+					{ transform: "scale(" + (1 + .05 * a) + "," + (1 - .05 * a) + ")" },
 					{ transform: "scale(1,1)" }
 				];
 			}
@@ -224,9 +226,10 @@ function createMotion() {
 			once: true,
 			kf: function(a) {
 				return [
-					{ transform: "skewX(0) skewY(0)" },
+					{ transform: "skewX(0deg) skewY(0deg)" },
 					{ transform: "skewX(" + -12 * a + "deg) skewY(" + -12 * a + "deg)" },
 					{ transform: "skewX(" + 6 * a + "deg) skewY(" + 6 * a + "deg)" },
+					{ transform: "skewX(" + -3 * a + "deg) skewY(" + -3 * a + "deg)" },
 					{ transform: "skewX(0) skewY(0)" }
 				];
 			}
@@ -241,6 +244,7 @@ function createMotion() {
 					{ transform: "scale(1) rotate(0)" },
 					{ transform: "scale(" + (1 - .1 * a) + ") rotate(" + -3 * a + "deg)" },
 					{ transform: "scale(" + (1 + .1 * a) + ") rotate(" + 3 * a + "deg)" },
+					{ transform: "scale(" + (1 + .1 * a) + ") rotate(" + -3 * a + "deg)" },
 					{ transform: "scale(1) rotate(0)" }
 				];
 			}
@@ -351,6 +355,7 @@ function createMotion() {
 					{ transform: "translateX(0)" },
 					{ transform: "translateX(" + -3 * a + "px)" },
 					{ transform: "translateX(" + 3 * a + "px)" },
+					{ transform: "translateX(" + -2 * a + "px)" },
 					{ transform: "translateX(0)" }
 				];
 			}
@@ -364,6 +369,7 @@ function createMotion() {
 					{ transform: "translateY(0)" },
 					{ transform: "translateY(" + -3 * a + "px)" },
 					{ transform: "translateY(" + 3 * a + "px)" },
+					{ transform: "translateY(" + -2 * a + "px)" },
 					{ transform: "translateY(0)" }
 				];
 			}
@@ -391,6 +397,7 @@ function createMotion() {
 					{ transform: "translateX(0) rotate(0)" },
 					{ transform: "translateX(" + -12 * a + "%) rotate(" + -5 * a + "deg)" },
 					{ transform: "translateX(" + 8 * a + "%) rotate(" + 3 * a + "deg)" },
+					{ transform: "translateX(" + -4 * a + "%) rotate(" + -2 * a + "deg)" },
 					{ transform: "translateX(0) rotate(0)" }
 				];
 			}
@@ -418,6 +425,7 @@ function createMotion() {
 					{ transform: "rotate(0deg)" },
 					{ transform: "rotate(" + 15 * a + "deg)" },
 					{ transform: "rotate(" + -10 * a + "deg)" },
+					{ transform: "rotate(" + 5 * a + "deg)" },
 					{ transform: "rotate(0deg)" }
 				];
 			}
@@ -492,9 +500,9 @@ function createMotion() {
 			base: 1600,
 			kf: function(a) {
 				return [
-					{ filter: "drop-shadow(0 0 0 currentColor)" },
-					{ filter: "drop-shadow(0 0 " + 5 * a + "px currentColor)" },
-					{ filter: "drop-shadow(0 0 0 currentColor)" }
+					{ filter: "drop-shadow(0 0 0 " + GLOW + ")" },
+					{ filter: "drop-shadow(0 0 " + 5 * a + "px " + GLOW + ")" },
+					{ filter: "drop-shadow(0 0 0 " + GLOW + ")" }
 				];
 			}
 		},

@@ -11,6 +11,7 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 ### Changed
 
 - **CI spends less and still watches `main`** (A6-gaps G19; this repository is public, so the policy is advice here, applied for consistency). Every CI job has a `timeout-minutes` (only two did, so a hung job could bill six hours). Draft pull requests run nothing; the run starts when one is marked ready. A weekly scheduled run (Monday 10:00 UTC) re-checks `main`, which matters now that no lock file is committed: a dependency release that breaks `main` no longer stays invisible until an unrelated pull request. Dependabot groups minor and patch updates into one pull request per ecosystem per week.
+- **The declaration-file fixture typechecks under the shared strict base** (React UI architecture, step 0.5). `tsconfig.base.json` is a byte-identical copy of `ichava/js-ui-kernel`'s `config/tsconfig.base.json`, and `tests/fixtures/tsconfig.json` extends it, keeping `skipLibCheck: false` so the hand-written `ichava-motion.d.ts` is still checked. The stricter flags (`noUncheckedIndexedAccess`, `noUnusedLocals` among them) now apply to the fixture; two of its locals became exports so they count as used. The base is not shipped (`files` lists only `dist`, `src`, `README.md` and `LICENSE`) and is export-ignored.
 
 ## [0.1.0] - 2026-10-23
 

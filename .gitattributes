@@ -19,3 +19,4 @@
 /.editorconfig  export-ignore
 /.gitattributes export-ignore
 /CONTRIBUTING.md export-ignore
+/tsconfig.base.json export-ignore

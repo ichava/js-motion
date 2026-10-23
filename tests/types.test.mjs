@@ -1,12 +1,13 @@
 // M9. The package advertised `exports["."].types` at ./dist/ichava-motion.d.ts
-// with no file there at all -- every TS consumer got `any`. The source is
-// plain JS, so there is nothing for `tsc --declaration` to generate from;
-// ichava-motion.d.ts is hand-written and only as trustworthy as something
-// that actually typechecks a real call pattern against it.
+// with no file there at all -- every TS consumer got `any`. The declarations were then
+// hand-written beside the plain-JS source. The source is TypeScript now, and
+// dist/ichava-motion.d.ts is generated from it by `npm run build`.
 //
-// fixtures/types-usage.ts imports the source `.js` directly (not `dist/`),
-// relying on TypeScript's own resolution of a sibling `.d.ts` -- the same
-// path a consumer's bundler takes through `exports["."].types` once built.
+// Two fixtures hold it, both resolving the package by its own name, which goes through
+// `exports["."].types` exactly as a consumer's does:
+//   fixtures/types-usage.ts   real call shapes must typecheck
+//   fixtures/api-contract.ts  every exported type must be mutually assignable with the
+//                             hand-written contract, fixtures/handwritten-api.d.ts
 //
 // Run: node --test tests/*.test.mjs
 
@@ -20,7 +21,7 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
-test('src/ichava-motion.d.ts declares the full public API used by the fixture', () => {
+test('dist/ichava-motion.d.ts declares the full public API, equivalent to the hand-written contract', () => {
   const tsc = join(root, 'node_modules/.bin/tsc');
   assert.ok(existsSync(tsc), 'typescript devDependency not installed');
 
@@ -30,7 +31,7 @@ test('src/ichava-motion.d.ts declares the full public API used by the fixture', 
   });
 });
 
-test('build copies the declaration file to dist/', () => {
+test('the build emits the declaration file to dist/', () => {
   const distDts = join(root, 'dist/ichava-motion.d.ts');
   if (!existsSync(distDts)) {
     // Not built in this checkout -- entrypoints.test.mjs applies the same
@@ -38,4 +39,16 @@ test('build copies the declaration file to dist/', () => {
     return;
   }
   assert.ok(existsSync(distDts));
+});
+
+// The deprecated src/ichava-motion.d.ts forwards to the generated declarations. Inside
+// TypeScript the shipped .ts source wins resolution of that path, so check the shim on
+// its own: it must compile and name only members the generated file exports.
+test('the deprecated src/ichava-motion.d.ts shim compiles against dist/', () => {
+  execFileSync(
+    join(root, 'node_modules/.bin/tsc'),
+    ['--ignoreConfig', '--noEmit', '--skipLibCheck', 'false', '--strict', '--module', 'esnext',
+      '--moduleResolution', 'bundler', '--target', 'es2022', '--lib', 'es2023,dom', join(root, 'src/ichava-motion.d.ts')],
+    { cwd: root, stdio: 'pipe' },
+  );
 });

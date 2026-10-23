@@ -20,3 +20,5 @@
 /.gitattributes export-ignore
 /CONTRIBUTING.md export-ignore
 /tsconfig.base.json export-ignore
+/tsconfig.json export-ignore
+/tsconfig.build.json export-ignore

@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const SOURCES = [
-  'src/ichava-motion.js',
+  'src/ichava-motion.ts',
   'dist/ichava-motion.js',
   'dist/ichava-motion.cjs',
   'dist/ichava-motion.mjs',
@@ -50,7 +50,7 @@ test('no shipped artifact fetches remote script', () => {
 });
 
 test('a supplied lottie player is used, and none is ever fetched', async () => {
-  const { default: IchavaMotion } = await import('../src/ichava-motion.js')
+  const { default: IchavaMotion } = await import('../src/ichava-motion.ts')
     .then((m) => ({ default: m.default ?? globalThis.IchavaMotion ?? m }))
     .catch(() => ({ default: null }));
 
@@ -58,7 +58,7 @@ test('a supplied lottie player is used, and none is ever fetched', async () => {
   // export. Resolution is asserted through the source contract instead when the
   // module does not expose an API here.
   if (!IchavaMotion || typeof IchavaMotion.config !== 'function') {
-    const code = readFileSync(new URL('../src/ichava-motion.js', import.meta.url), 'utf8');
+    const code = readFileSync(new URL('../src/ichava-motion.ts', import.meta.url), 'utf8');
     assert.ok(
       /CONFIG\.lottiePlayer/.test(code),
       'config must expose lottiePlayer so a consumer can supply the player'

@@ -1,4 +1,5 @@
-// Exercises the hand-written declarations against real call shapes. Not run as
+// Exercises the published declarations (dist/ichava-motion.d.ts, through the package name)
+// against real call shapes. Not run as
 // a program -- only typechecked (see ../types.test.mjs). If this file stops
 // compiling, either the .d.ts drifted from the real API or a caller pattern
 // this package promises to support no longer typechecks.
@@ -10,7 +11,7 @@ import IchavaMotion, {
   type FamilySpec,
   type VariantSpec,
   type IchavaMotionApi,
-} from '../../src/ichava-motion.js';
+} from '@ichava/js-motion';
 
 const el = document.querySelector('.icon')!;
 

@@ -5,7 +5,7 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const SRC = readFileSync(new URL('../src/ichava-motion.js', import.meta.url), 'utf8');
+const SRC = readFileSync(new URL('../src/ichava-motion.ts', import.meta.url), 'utf8');
 
 test('M4: config merging cannot reach Object.prototype', async () => {
   // The realistic vector: config arrives as JSON, and JSON.parse produces an OWN
@@ -21,7 +21,7 @@ test('M4: config merging cannot reach Object.prototype', async () => {
 
   // assign() is module-private, so drive it through the public config surface
   // when available and fall back to asserting the guard exists in source.
-  const mod = await import('../src/ichava-motion.js').catch(() => null);
+  const mod = await import('../src/ichava-motion.ts').catch(() => null);
   const api = globalThis.IchavaMotion ?? mod?.default;
 
   if (api && typeof api.config === 'function') {

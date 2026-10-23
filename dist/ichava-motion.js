@@ -1,6 +1,6 @@
 "use strict";
 var IchavaMotion = (function() {
-	// src/ichava-motion.js
+	// src/ichava-motion.ts
 	var VERSION = "1.0.0";
 	var EASINGS = {
 		linear: "linear",
@@ -17,7 +17,7 @@ var IchavaMotion = (function() {
 	function resolveEasing(e) {
 		if (!e) return "ease-in-out";
 		if (EASINGS[e]) return EASINGS[e];
-		if (/^(linear|ease(-in|-out|-in-out)?|step-(start|end)|steps\([^)]+\)|cubic-bezier\(\s*-?\d*\.?\d+\s*(,\s*-?\d*\.?\d+\s*){3}\))$/.test(String(e).trim())) return e;
+		if (/^(linear|ease(-in|-out|-in-out)?|step-(start|end)|steps\([^)]+\)|cubic-bezier\(\s*-?(?:\d+(?:\.\d+)?|\.\d+)\s*(,\s*-?(?:\d+(?:\.\d+)?|\.\d+)\s*){3}\))$/.test(String(e).trim())) return e;
 		return "ease-in-out";
 	}
 	var P = "perspective(400px)";

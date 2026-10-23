@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Typecheck the source
+        run: npm run typecheck
+
       - name: Tests
         run: npm test
 
@@ -95,8 +98,8 @@ jobs:
           # The JS artifacts have the same history: dist/ichava-motion.js used to be a
           # hand copy of src/ with no build step behind it, so a stale artifact was
           # indistinguishable from a fresh one.
-          git diff --exit-code -- dist/ichava-motion.js dist/ichava-motion.mjs dist/ichava-motion.cjs \
-            || { echo "::error::npm run build rewrote a JS artifact (M1). Commit the build output."; exit 1; }
+          git diff --exit-code -- dist/ichava-motion.js dist/ichava-motion.mjs dist/ichava-motion.cjs dist/ichava-motion.d.ts \
+            || { echo "::error::npm run build rewrote a JS artifact or the declarations (M1). Commit the build output."; exit 1; }
 
   config-drift:
     name: Shared config matches the kernel

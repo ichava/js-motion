@@ -5,5 +5,5 @@
     // it must not be skipped as a library file.
     "skipLibCheck": false
   },
-  "include": ["types-usage.ts"]
+  "include": ["types-usage.ts", "api-contract.ts"]
 }

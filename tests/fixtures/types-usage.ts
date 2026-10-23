@@ -11,6 +11,7 @@ import IchavaMotion, {
   type FamilySpec,
   type VariantSpec,
   type IchavaMotionApi,
+  type MotionCatalog,
 } from '@ichava/js-motion';
 
 const el = document.querySelector('.icon')!;
@@ -45,3 +46,6 @@ IchavaMotion.register('custom-id', { keyframes: [{ opacity: 0 }, { opacity: 1 }]
 
 const own: IchavaMotionApi = IchavaMotion.create().config({ reduceMotion: 'respect' }).registerEasing('snap', 'cubic-bezier(.2,1.4,.4,1)');
 own.play(el, 'spin-subtle', { speed: 1.25 });
+
+const catalog: MotionCatalog = IchavaMotion.catalog();
+export const familyIds: string[] = catalog.families.map((f) => f.id);

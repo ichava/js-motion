@@ -82,6 +82,18 @@ const families = [...new Set(manifest.presets.map(p => p.family))]
 Remember the two sentinels: `manifest.count` is 242 because it includes `None` and `JSON · Custom`,
 which a picker should offer but which are not animations.
 
+## Listing the families and variants
+
+`IchavaMotion.catalog()` returns the families and variants the registry is generated from, as typed copies (`MotionCatalog`). Every preset is one family in one variant, so a picker can group presets by family without keeping its own tables:
+
+```js
+const { families, variants } = IchavaMotion.catalog();
+families.map((f) => f.label);          // 'Spin', 'Spin Y', ...
+variants.map((v) => v.s || 'Default'); // ' · Reverse', ' · Subtle', ...
+```
+
+It follows `registerFamily()` and `registerVariant()` on the instance it is called on.
+
 ---
 
 [← Docs index](../README.md#documentation)

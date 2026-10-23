@@ -868,6 +868,16 @@ var IchavaMotion = (function() {
 			},
 			create: function() {
 				return createMotion();
+			},
+			catalog: function() {
+				return {
+					families: FAMILIES.map(function(f) {
+						return assign({}, f);
+					}),
+					variants: VARIANTS.map(function(v) {
+						return assign({}, v);
+					})
+				};
 			}
 		};
 		IchavaMotion.autoInit = function autoInit() {

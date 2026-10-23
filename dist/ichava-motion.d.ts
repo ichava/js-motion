@@ -94,6 +94,11 @@ export interface PlaySpec {
     direction?: Direction;
     origin?: string;
 }
+/** What `catalog()` returns. */
+export interface MotionCatalog {
+    families: FamilySpec[];
+    variants: VariantSpec[];
+}
 export interface IchavaMotionApi {
     readonly version: string;
     /** Merge partial config over the current settings (prototype-pollution-safe). Returns `this` for chaining. */
@@ -131,6 +136,13 @@ export interface IchavaMotionApi {
      *   const motion = IchavaMotion.create().config({ reduceMotion: 'respect' });
      */
     create(): IchavaMotionApi;
+    /**
+     * The families and variants the preset registry is generated from, as copies: every
+     * preset is one family played in one variant (`presetIds().length` is their product).
+     * A picker can list them without keeping its own tables. Follows `registerFamily()`
+     * and `registerVariant()` on this instance.
+     */
+    catalog(): MotionCatalog;
     /**
      * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
      * Off by default (WCAG 2.2.2): merely loading the script must not start looping

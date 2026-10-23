@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Added
+
+- **Releases are prepared by release-please.** A *Release Please* workflow reads the Conventional Commit log, keeps one release pull request open that bumps `package.json`, `.release-please-manifest.json` and the README's version line, and tags the release when that pull request merges; the tag starts `release.yml` as before. On 0.x a breaking change bumps the minor and everything else bumps the patch. Release notes stay hand-written: release-please is set to `skip-changelog`, and the workflow closes this `[Unreleased]` section under the new version on the release branch, failing if it is empty. It runs on `workflow_dispatch`, a weekly schedule, and the merge of a release pull request, so the repository still has no `push` trigger other than tags. The pull request and the tag are made with a per-run Refresh Bot token, because ones made with `GITHUB_TOKEN` start no workflows.
+
 ### Changed
 
 - **CI spends less and still watches `main`** (A6-gaps G19; this repository is public, so the policy is advice here, applied for consistency). Every CI job has a `timeout-minutes` (only two did, so a hung job could bill six hours). Draft pull requests run nothing; the run starts when one is marked ready. A weekly scheduled run (Monday 10:00 UTC) re-checks `main`, which matters now that no lock file is committed: a dependency release that breaks `main` no longer stays invisible until an unrelated pull request. Dependabot groups minor and patch updates into one pull request per ecosystem per week.

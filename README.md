@@ -99,6 +99,14 @@ IchavaMotion.registerFamily({ id: 'twirl', label: 'Twirl', base: 1000, kf: (a) =
 ```
 Custom `cubic-bezier(...)` / `steps(...)` easings are accepted verbatim.
 
+`IchavaMotion` is one engine; `IchavaMotion.create()` makes another, with its own presets,
+easings and config, so two embeds on one page can configure motion separately:
+
+```js
+const motion = IchavaMotion.create().config({ reduceMotion: 'respect' }).registerEasing('snap', 'cubic-bezier(.2,1.4,.4,1)');
+motion.play(el, 'spin-subtle', { speed: 1.25 });
+```
+
 ## Lottie (tiered and opt-in, so the core stays light)
 
 - `config({ lottie: 'off' })`: **default**; ignores bodymovin JSON. Core payload only.

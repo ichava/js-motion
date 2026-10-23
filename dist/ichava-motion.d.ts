@@ -124,11 +124,20 @@ export interface IchavaMotionApi {
     /** Register a named easing (e.g. 'elastic' -> a cubic-bezier() value). */
     registerEasing(name: string, value: string): IchavaMotionApi;
     /**
+     * A new, independent engine: its own preset registry, easings, families, variants and
+     * config, starting from the built-in set. Registering or configuring it never reaches
+     * this instance or any other, so two embeds on one page can differ.
+     *
+     *   const motion = IchavaMotion.create().config({ reduceMotion: 'respect' });
+     */
+    create(): IchavaMotionApi;
+    /**
      * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
      * Off by default (WCAG 2.2.2): merely loading the script must not start looping
      * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
      */
     autoInit(): IchavaMotionApi;
 }
+/** The default instance: the module's default export and the `<script>` global. */
 declare var IchavaMotion: IchavaMotionApi;
 export default IchavaMotion;

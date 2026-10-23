@@ -1,3 +1,4 @@
+// @ts-nocheck -- moved verbatim from ichava-motion.js; the types arrive in the next commit.
 /*
  * Module scope, not an IIFE.
  *

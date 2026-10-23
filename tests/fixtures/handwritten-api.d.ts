@@ -1,11 +1,6 @@
-// Hand-authored declarations for the public API of src/ichava-motion.js.
-//
-// The source is plain JS (no TypeScript in this package), so there is nothing
-// for `tsc --declaration` to generate from. Hand-writing the surface here,
-// rather than shipping no types at all, is the documented fix for `M9`. Keep
-// this in sync with the `IchavaMotion` object at the bottom of
-// ichava-motion.js -- there is no automated check tying the two together
-// beyond the type-shape test in tests/types.test.mjs.
+// The hand-authored declarations that shipped as src/ichava-motion.d.ts while the source
+// was plain JS (the fix for `M9`). Kept as the API contract: the declarations generated
+// from src/ichava-motion.ts must stay equivalent to these (tests/types.test.mjs).
 
 export type Direction = 'normal' | 'reverse' | 'alternate';
 

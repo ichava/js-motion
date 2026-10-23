@@ -1,6 +1,6 @@
 "use strict";
 var IchavaMotion = (function() {
-	// src/ichava-motion.js
+	// src/ichava-motion.ts
 	var VERSION = "1.0.0";
 	var EASINGS = {
 		linear: "linear",

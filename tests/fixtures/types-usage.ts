@@ -10,7 +10,7 @@ import IchavaMotion, {
   type FamilySpec,
   type VariantSpec,
   type IchavaMotionApi,
-} from '../../src/ichava-motion.js';
+} from './handwritten-api.js';
 
 const el = document.querySelector('.icon')!;
 

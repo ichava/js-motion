@@ -19,7 +19,7 @@ export default defineConfig({
     emptyOutDir: false,
     sourcemap: true,
     lib: {
-      entry: 'src/ichava-motion.js',
+      entry: 'src/ichava-motion.ts',
       name: 'IchavaMotion',
       formats: ['es', 'cjs', 'iife'],
       fileName: (format) =>

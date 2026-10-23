@@ -165,6 +165,15 @@ export interface IchavaMotionApi {
   registerEasing(name: string, value: string): IchavaMotionApi;
 
   /**
+   * A new, independent engine: its own preset registry, easings, families, variants and
+   * config, starting from the built-in set. Registering or configuring it never reaches
+   * this instance or any other, so two embeds on one page can differ.
+   *
+   *   const motion = IchavaMotion.create().config({ reduceMotion: 'respect' });
+   */
+  create(): IchavaMotionApi;
+
+  /**
    * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
    * Off by default (WCAG 2.2.2): merely loading the script must not start looping
    * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
@@ -549,7 +558,8 @@ function createMotion(): IchavaMotionApi {
     register: function (id, spec) { PRESETS[id] = assign({ id: id, keyframes: [], base: 1000, iterations: Infinity, direction: 'normal' }, spec); return this; },
     registerFamily: function (family) { FAMILIES.push(family); buildPresets(); return this; },
     registerVariant: function (variant) { VARIANTS.push(variant); buildPresets(); return this; },
-    registerEasing: function (name, value) { EASINGS[name] = value; return this; }
+    registerEasing: function (name, value) { EASINGS[name] = value; return this; },
+    create: function () { return createMotion(); }
   } as IchavaMotionApi;
 
   /*

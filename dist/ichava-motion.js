@@ -865,6 +865,9 @@ var IchavaMotion = (function() {
 			registerEasing: function(name, value) {
 				EASINGS[name] = value;
 				return this;
+			},
+			create: function() {
+				return createMotion();
 			}
 		};
 		IchavaMotion.autoInit = function autoInit() {

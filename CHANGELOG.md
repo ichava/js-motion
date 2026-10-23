@@ -4,6 +4,8 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-23
+
 ### Added
 
 - **`IchavaMotion.catalog()`** (React UI architecture, step 4.3): the families and variants the preset registry is generated from, as typed copies (`MotionCatalog`), so react-icon-browser's motion picker can list them instead of keeping duplicated tables. It follows `registerFamily()`/`registerVariant()` per instance, and changing the copy does not change the engine. `tests/catalog.test.mjs` failed first.

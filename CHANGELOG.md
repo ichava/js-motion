@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Changed
+
+- **CI spends less and still watches `main`** (A6-gaps G19; this repository is public, so the policy is advice here, applied for consistency). Every CI job has a `timeout-minutes` (only two did, so a hung job could bill six hours). Draft pull requests run nothing; the run starts when one is marked ready. A weekly scheduled run (Monday 10:00 UTC) re-checks `main`, which matters now that no lock file is committed: a dependency release that breaks `main` no longer stays invisible until an unrelated pull request. Dependabot groups minor and patch updates into one pull request per ecosystem per week.
+
 ## [0.1.0] - 2026-10-23
 
 Versioning re-based to 0.1.0. This release contains everything previously tagged v0.1.0 through v0.1.2 (2026-08-31 to 2026-09-22) plus the changes below. Those tags and their GitHub releases were removed; every commit they pointed at is on `main`, and their sections are kept under *Archived pre-reset history*.

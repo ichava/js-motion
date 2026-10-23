@@ -8,6 +8,10 @@ updates:
       time: "06:00"
       timezone: America/New_York
     open-pull-requests-limit: 5
+    # One pull request per week for minor and patch updates; majors stay separate.
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
@@ -16,3 +20,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: America/New_York
+    # One pull request per week for minor and patch updates; majors stay separate.
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

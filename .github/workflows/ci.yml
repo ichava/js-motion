@@ -3,7 +3,14 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # ready_for_review: a draft runs nothing, so marking it ready must start the run.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+  # The post-merge check. With CI on pull_request only, nothing re-runs after a merge,
+  # and with no lock file committed a dependency release that breaks main would stay
+  # invisible until an unrelated pull request went red. Weekly, Monday 10:00 UTC.
+  schedule:
+    - cron: '0 10 * * 1'
 
 permissions:
   contents: read
@@ -16,6 +23,9 @@ jobs:
   test:
     name: Tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +55,9 @@ jobs:
   build-integrity:
     name: Build does not destroy committed output
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     # EXPECTED TO FAIL until M2 is fixed in M-P1.
     #
     # src/ichava-motion.scss contains zero @keyframes and never invokes its own
@@ -88,6 +101,8 @@ jobs:
   actionlint:
     name: Workflow lint
     runs-on: ubuntu-latest
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     timeout-minutes: 5
 
     # Nothing else reads these files until a tag is pushed. `release.yml` triggers
@@ -107,6 +122,8 @@ jobs:
 
   changelog:
     runs-on: ubuntu-latest
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     timeout-minutes: 5
     name: Changelog order
 

@@ -6,8 +6,10 @@
 
 ## Where this package is
 
-`v0.1.0`, the first open-source release, alongside every other package in the ecosystem. Earlier
-tags never existed here: this repository was untagged until the reset.
+`v0.1.0`, re-based on 2026-10-23 with every other package in the ecosystem. The pre-reset tags
+`v0.1.0` to `v0.1.2` (2026-08-31 to 2026-09-22, published as `@ichava/motion`) were removed; their
+commits are on `main` and their notes are kept in `CHANGELOG.md` under *Archived pre-reset history*.
+The first tag under the `@ichava/js-motion` name is the re-based `v0.1.0`.
 
 **Not published to npm.** Consumers install from the repository; see
 [installation](installation.md).

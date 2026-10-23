@@ -8,6 +8,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 - **The release pull request is found in the same run that opens it.** The step that hands the release branch to the changelog close asked `gh pr list --label 'autorelease: pending'`, which goes through GitHub's search index; on the first live run (js-motion#30) the index had not caught up with the pull request opened seconds earlier, so the close was skipped and a second dispatch was needed. It now takes the branch from release-please's own `pr` output, and only when the action reports nothing (the pull request was already current) falls back to the open pull requests, matched by the `release-please--branches--main` prefix rather than the label.
 
+### Changed
+
+- **Eight families take react-icon-browser's richer keyframes** (decided by Sim, so the browser can list its presets from `catalog()` with no visual change). Rubber-band, jello, tada, shake-x, shake-y, wobble and swing gain a settling frame before coming to rest, and jello's first frame reads `skewX(0deg) skewY(0deg)`. Glow's shadow colour is `var(--ichm-glow-color, currentColor)`, in the presets and the CSS tier: unchanged unless a container sets `--ichm-glow-color`, which lets it follow an accent. These animations look slightly different for every consumer. `tests/keyframes.test.mjs` pins the new keyframes at the base and Bold variants; it failed on `main` first.
+
 ## [0.1.1] - 2026-10-23
 
 ### Added

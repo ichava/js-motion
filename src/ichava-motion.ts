@@ -245,6 +245,12 @@ function createMotion(): IchavaMotionApi {
 
   /* ─── family × variant preset generator (mirrors the app's MotionEngine) ── */
   var P = 'perspective(400px)';
+  /*
+   * Glow's colour: the `--ichm-glow-color` custom property when the page sets it, else
+   * the icon's own colour. A host that wants the glow to follow its accent sets
+   * `--ichm-glow-color: var(--accent)` on a container (react-icon-browser does).
+   */
+  var GLOW = 'var(--ichm-glow-color, currentColor)';
   var VARIANTS: VariantSpec[] = [
     { s: '', a: 1, d: 1, r: false }, { s: ' · Reverse', a: 1, d: 1, r: true },
     { s: ' · Subtle', a: 0.55, d: 1.15, r: false }, { s: ' · Subtle · Reverse', a: 0.55, d: 1.15, r: true },
@@ -264,9 +270,9 @@ function createMotion(): IchavaMotionApi {
     { id: 'zoom-in', label: 'Zoom In', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(' + (1 - 0.4 * a) + ')', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }]; } },
     { id: 'zoom-out', label: 'Zoom Out', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(' + (1 + 0.4 * a) + ')', opacity: 0 }]; } },
     { id: 'pop', label: 'Pop', base: 500, once: true, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ')' }, { transform: 'scale(1)' }]; } },
-    { id: 'rubber-band', label: 'Rubber Band', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1,1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ',' + (1 - 0.25 * a) + ')' }, { transform: 'scale(' + (1 - 0.15 * a) + ',' + (1 + 0.15 * a) + ')' }, { transform: 'scale(1,1)' }]; } },
-    { id: 'jello', label: 'Jello', base: 900, once: true, kf: function (a: number) { return [{ transform: 'skewX(0) skewY(0)' }, { transform: 'skewX(' + (-12 * a) + 'deg) skewY(' + (-12 * a) + 'deg)' }, { transform: 'skewX(' + (6 * a) + 'deg) skewY(' + (6 * a) + 'deg)' }, { transform: 'skewX(0) skewY(0)' }]; } },
-    { id: 'tada', label: 'Tada', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'scale(1) rotate(0)' }, { transform: 'scale(' + (1 - 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (3 * a) + 'deg)' }, { transform: 'scale(1) rotate(0)' }]; } },
+    { id: 'rubber-band', label: 'Rubber Band', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1,1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ',' + (1 - 0.25 * a) + ')' }, { transform: 'scale(' + (1 - 0.15 * a) + ',' + (1 + 0.15 * a) + ')' }, { transform: 'scale(' + (1 + 0.05 * a) + ',' + (1 - 0.05 * a) + ')' }, { transform: 'scale(1,1)' }]; } },
+    { id: 'jello', label: 'Jello', base: 900, once: true, kf: function (a: number) { return [{ transform: 'skewX(0deg) skewY(0deg)' }, { transform: 'skewX(' + (-12 * a) + 'deg) skewY(' + (-12 * a) + 'deg)' }, { transform: 'skewX(' + (6 * a) + 'deg) skewY(' + (6 * a) + 'deg)' }, { transform: 'skewX(' + (-3 * a) + 'deg) skewY(' + (-3 * a) + 'deg)' }, { transform: 'skewX(0) skewY(0)' }]; } },
+    { id: 'tada', label: 'Tada', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'scale(1) rotate(0)' }, { transform: 'scale(' + (1 - 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(1) rotate(0)' }]; } },
     { id: 'bounce', label: 'Bounce', base: 900, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-22 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
     { id: 'float', label: 'Float', base: 2400, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-12 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
     { id: 'hop', label: 'Hop', base: 800, kf: function (a: number) { return [{ transform: 'translateY(0) scaleY(1)' }, { transform: 'translateY(0) scaleY(0.86)' }, { transform: 'translateY(' + (-24 * a) + '%) scaleY(1.05)' }, { transform: 'translateY(0) scaleY(1)' }]; } },
@@ -274,18 +280,18 @@ function createMotion(): IchavaMotionApi {
     { id: 'slide-down', label: 'Slide Down', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateY(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
     { id: 'slide-left', label: 'Slide Left', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
     { id: 'slide-right', label: 'Slide Right', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
-    { id: 'shake-x', label: 'Shake X', base: 600, kf: function (a: number) { return [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-3 * a) + 'px)' }, { transform: 'translateX(' + (3 * a) + 'px)' }, { transform: 'translateX(0)' }]; } },
-    { id: 'shake-y', label: 'Shake Y', base: 600, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-3 * a) + 'px)' }, { transform: 'translateY(' + (3 * a) + 'px)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'shake-x', label: 'Shake X', base: 600, kf: function (a: number) { return [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-3 * a) + 'px)' }, { transform: 'translateX(' + (3 * a) + 'px)' }, { transform: 'translateX(' + (-2 * a) + 'px)' }, { transform: 'translateX(0)' }]; } },
+    { id: 'shake-y', label: 'Shake Y', base: 600, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-3 * a) + 'px)' }, { transform: 'translateY(' + (3 * a) + 'px)' }, { transform: 'translateY(' + (-2 * a) + 'px)' }, { transform: 'translateY(0)' }]; } },
     { id: 'vibrate', label: 'Vibrate', base: 300, kf: function (a: number) { return [{ transform: 'translate(0,0)' }, { transform: 'translate(' + (-1.5 * a) + 'px,' + (1.5 * a) + 'px)' }, { transform: 'translate(' + (1.5 * a) + 'px,' + (-1.5 * a) + 'px)' }, { transform: 'translate(0,0)' }]; } },
-    { id: 'wobble', label: 'Wobble', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'translateX(0) rotate(0)' }, { transform: 'translateX(' + (-12 * a) + '%) rotate(' + (-5 * a) + 'deg)' }, { transform: 'translateX(' + (8 * a) + '%) rotate(' + (3 * a) + 'deg)' }, { transform: 'translateX(0) rotate(0)' }]; } },
+    { id: 'wobble', label: 'Wobble', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'translateX(0) rotate(0)' }, { transform: 'translateX(' + (-12 * a) + '%) rotate(' + (-5 * a) + 'deg)' }, { transform: 'translateX(' + (8 * a) + '%) rotate(' + (3 * a) + 'deg)' }, { transform: 'translateX(' + (-4 * a) + '%) rotate(' + (-2 * a) + 'deg)' }, { transform: 'translateX(0) rotate(0)' }]; } },
     { id: 'wiggle', label: 'Wiggle', base: 800, kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-11 * a) + 'deg)' }, { transform: 'rotate(' + (11 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
-    { id: 'swing', label: 'Swing', base: 1000, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (15 * a) + 'deg)' }, { transform: 'rotate(' + (-10 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'swing', label: 'Swing', base: 1000, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (15 * a) + 'deg)' }, { transform: 'rotate(' + (-10 * a) + 'deg)' }, { transform: 'rotate(' + (5 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
     { id: 'pendulum', label: 'Pendulum', base: 1600, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(' + (-20 * a) + 'deg)' }, { transform: 'rotate(' + (20 * a) + 'deg)' }, { transform: 'rotate(' + (-20 * a) + 'deg)' }]; } },
     { id: 'rock', label: 'Rock', base: 1200, origin: 'bottom center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-8 * a) + 'deg)' }, { transform: 'rotate(' + (8 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
     { id: 'fade', label: 'Fade', base: 1400, kf: function (a: number) { return [{ opacity: Math.max(0, 1 - a) }, { opacity: 1 }]; } },
     { id: 'blink', label: 'Blink', base: 1000, kf: function () { return [{ opacity: 1 }, { opacity: 1 }, { opacity: 0 }, { opacity: 0 }, { opacity: 1 }]; } },
     { id: 'flash', label: 'Flash', base: 1000, once: true, kf: function () { return [{ opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }]; } },
-    { id: 'glow', label: 'Glow', base: 1600, kf: function (a: number) { return [{ filter: 'drop-shadow(0 0 0 currentColor)' }, { filter: 'drop-shadow(0 0 ' + (5 * a) + 'px currentColor)' }, { filter: 'drop-shadow(0 0 0 currentColor)' }]; } },
+    { id: 'glow', label: 'Glow', base: 1600, kf: function (a: number) { return [{ filter: 'drop-shadow(0 0 0 ' + GLOW + ')' }, { filter: 'drop-shadow(0 0 ' + (5 * a) + 'px ' + GLOW + ')' }, { filter: 'drop-shadow(0 0 0 ' + GLOW + ')' }]; } },
     { id: 'draw', label: 'Draw', base: 1400, once: true, domOnly: true, draw: true, stagger: 120, kf: function () { return [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }]; } },
     /* illustration families — animate the SVG's child layers, not just the root */
     { id: 'reveal', label: 'Reveal', base: 700, once: true, perChild: true, stagger: 90, kf: function (a: number) { return [{ opacity: 0, transform: 'translateY(' + (14 * a) + 'px)' }, { opacity: 1, transform: 'translateY(0)' }]; } },

@@ -124,6 +124,12 @@ export interface PlaySpec {
   origin?: string;
 }
 
+/** What `catalog()` returns. */
+export interface MotionCatalog {
+  families: FamilySpec[];
+  variants: VariantSpec[];
+}
+
 export interface IchavaMotionApi {
   readonly version: string;
 
@@ -172,6 +178,14 @@ export interface IchavaMotionApi {
    *   const motion = IchavaMotion.create().config({ reduceMotion: 'respect' });
    */
   create(): IchavaMotionApi;
+
+  /**
+   * The families and variants the preset registry is generated from, as copies: every
+   * preset is one family played in one variant (`presetIds().length` is their product).
+   * A picker can list them without keeping its own tables. Follows `registerFamily()`
+   * and `registerVariant()` on this instance.
+   */
+  catalog(): MotionCatalog;
 
   /**
    * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
@@ -559,7 +573,10 @@ function createMotion(): IchavaMotionApi {
     registerFamily: function (family) { FAMILIES.push(family); buildPresets(); return this; },
     registerVariant: function (variant) { VARIANTS.push(variant); buildPresets(); return this; },
     registerEasing: function (name, value) { EASINGS[name] = value; return this; },
-    create: function () { return createMotion(); }
+    create: function () { return createMotion(); },
+    catalog: function () {
+      return { families: FAMILIES.map(function (f) { return assign({}, f); }), variants: VARIANTS.map(function (v) { return assign({}, v); }) };
+    }
   } as IchavaMotionApi;
 
   /*

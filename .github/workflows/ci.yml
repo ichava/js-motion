@@ -98,6 +98,35 @@ jobs:
           git diff --exit-code -- dist/ichava-motion.js dist/ichava-motion.mjs dist/ichava-motion.cjs \
             || { echo "::error::npm run build rewrote a JS artifact (M1). Commit the build output."; exit 1; }
 
+  config-drift:
+    name: Shared config matches the kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # tsconfig.base.json and the drift-check script are copies of ichava/js-ui-kernel's
+    # config/. Fails when a copy stops matching the kernel's main, on a non-200 answer or
+    # an empty body; the second step proves it fails on a planted one-byte change.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Copies match the kernel
+        run: npm run check:config-drift
+
+      - name: A drifted copy fails the check
+        run: |
+          printf ' ' >> tsconfig.base.json
+          if npm run check:config-drift; then
+            echo "::error::the drift check passed on a modified copy, so it checks nothing"
+            exit 1
+          fi
+          git checkout -- tsconfig.base.json
+
   actionlint:
     name: Workflow lint
     runs-on: ubuntu-latest

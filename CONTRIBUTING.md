@@ -32,7 +32,10 @@ the check.
 ## Semver
 
 Versioned against the preset contract, not the internals. Removing a preset id or changing what one
-does is breaking; adding a family is a minor; retiming within a variant band is a patch.
+does is breaking. While the version is 0.x a breaking change bumps the minor and everything else,
+adding a family included, bumps the patch. The commit type decides it (`feat!:` or a
+`BREAKING CHANGE:` footer for breaking), because release-please reads it to prepare the release; see
+[docs/release.md](docs/release.md).
 
 ## Security
 

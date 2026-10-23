@@ -197,6 +197,11 @@ interface LottieGlobals {
   lottie?: LottiePlayer;
 }
 
+/*
+ * One engine instance: its own easings, families, variants, preset registry, config and
+ * wiring. The module's default export is one of these, built once below.
+ */
+function createMotion(): IchavaMotionApi {
   var VERSION = '1.0.0';
 
   /* ─── easings (label ↔ value; value is what WAAPI receives) ─────────────── */
@@ -547,7 +552,37 @@ interface LottieGlobals {
     registerEasing: function (name, value) { EASINGS[name] = value; return this; }
   } as IchavaMotionApi;
 
+  /*
+   * Auto-scan is OPT-IN.
+   *
+   * It used to run on DOMContentLoaded unless `window.__ichavaMotionNoAuto` was set --
+   * opt-out, so simply loading the script started animation the user never asked for. WCAG
+   * 2.2.2 requires motion that starts automatically and lasts more than five seconds to be
+   * pausable, stoppable or hideable, and the presets here loop indefinitely. Defaulting to
+   * off means a page opts in deliberately, and `autoInit()` is there for the `<script>` tag
+   * users who want the old behaviour:
+   *
+   *   <script src="ichava-motion.js"></script>
+   *   <script>IchavaMotion.autoInit()</script>
+   *
+   * `prefersReduced()` is still honoured inside `auto()`, so even an explicit opt-in does
+   * nothing for a user who asked for less motion.
+   */
+  IchavaMotion.autoInit = function autoInit(): IchavaMotionApi {
+    if (typeof document === 'undefined') return IchavaMotion;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { auto(); });
+    } else {
+      auto();
+    }
+    return IchavaMotion;
+  };
 
+  return IchavaMotion;
+}
+
+/** The default instance: the module's default export and the `<script>` global. */
+var IchavaMotion = createMotion();
 
 /*
  * The global is for the `<script>` build only, and is assigned defensively so importing
@@ -556,32 +591,6 @@ interface LottieGlobals {
 if (typeof globalThis !== 'undefined' && typeof globalThis.document !== 'undefined') {
   (globalThis as typeof globalThis & { IchavaMotion?: IchavaMotionApi }).IchavaMotion = IchavaMotion;
 }
-
-/*
- * Auto-scan is OPT-IN.
- *
- * It used to run on DOMContentLoaded unless `window.__ichavaMotionNoAuto` was set --
- * opt-out, so simply loading the script started animation the user never asked for. WCAG
- * 2.2.2 requires motion that starts automatically and lasts more than five seconds to be
- * pausable, stoppable or hideable, and the presets here loop indefinitely. Defaulting to
- * off means a page opts in deliberately, and `autoInit()` is there for the `<script>` tag
- * users who want the old behaviour:
- *
- *   <script src="ichava-motion.js"></script>
- *   <script>IchavaMotion.autoInit()</script>
- *
- * `prefersReduced()` is still honoured inside `auto()`, so even an explicit opt-in does
- * nothing for a user who asked for less motion.
- */
-IchavaMotion.autoInit = function autoInit(): IchavaMotionApi {
-  if (typeof document === 'undefined') return IchavaMotion;
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { auto(); });
-  } else {
-    auto();
-  }
-  return IchavaMotion;
-};
 
 /*
  * Default export only, deliberately.

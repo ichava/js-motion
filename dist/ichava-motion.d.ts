@@ -130,5 +130,6 @@ export interface IchavaMotionApi {
      */
     autoInit(): IchavaMotionApi;
 }
+/** The default instance: the module's default export and the `<script>` global. */
 declare var IchavaMotion: IchavaMotionApi;
 export default IchavaMotion;

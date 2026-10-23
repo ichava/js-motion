@@ -40,3 +40,15 @@ test('the build emits the declaration file to dist/', () => {
   }
   assert.ok(existsSync(distDts));
 });
+
+// The deprecated src/ichava-motion.d.ts forwards to the generated declarations. Inside
+// TypeScript the shipped .ts source wins resolution of that path, so check the shim on
+// its own: it must compile and name only members the generated file exports.
+test('the deprecated src/ichava-motion.d.ts shim compiles against dist/', () => {
+  execFileSync(
+    join(root, 'node_modules/.bin/tsc'),
+    ['--ignoreConfig', '--noEmit', '--skipLibCheck', 'false', '--strict', '--module', 'esnext',
+      '--moduleResolution', 'bundler', '--target', 'es2022', '--lib', 'es2023,dom', join(root, 'src/ichava-motion.d.ts')],
+    { cwd: root, stdio: 'pipe' },
+  );
+});

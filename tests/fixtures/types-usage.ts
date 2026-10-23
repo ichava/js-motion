@@ -29,8 +29,8 @@ const spec: MotionSpec = IchavaMotion.presets()['spin']!;
 IchavaMotion.playSpec(el, spec, opts);
 IchavaMotion.fromJSON(el, { keyframes: spec.keyframes, base: 1000 }, { trigger: 'loop' });
 
-const ids: string[] = IchavaMotion.presetIds();
-const easings: Record<string, string> = IchavaMotion.easings();
+export const ids: string[] = IchavaMotion.presetIds();
+export const easings: Record<string, string> = IchavaMotion.easings();
 
 IchavaMotion.auto();
 IchavaMotion.auto(document.body);

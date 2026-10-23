@@ -1,11 +1,8 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2023", "DOM"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "noEmit": true,
+    // The point of this fixture is to typecheck the hand-written declaration file, so
+    // it must not be skipped as a library file.
     "skipLibCheck": false
   },
   "include": ["types-usage.ts"]

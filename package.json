@@ -47,9 +47,10 @@
   ],
   "scripts": {
     "gen": "node scripts/gen-presets.mjs",
-    "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build",
+    "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build && tsc -p tsconfig.build.json",
     "dev": "vite --open /demo/",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "sass": "^1.77.0",

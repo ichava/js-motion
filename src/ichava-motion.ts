@@ -1,4 +1,3 @@
-// @ts-nocheck -- moved verbatim from ichava-motion.js; the types arrive in the next commit.
 /*
  * Module scope, not an IIFE.
  *
@@ -14,17 +13,201 @@
  */
 'use strict';
 
+/* ─── public types ──────────────────────────────────────────────────────────
+ * These were hand-written in src/ichava-motion.d.ts while this file was plain JS.
+ * They are now the source of dist/ichava-motion.d.ts, and tests/types.test.mjs holds
+ * them equivalent to the hand-written contract in tests/fixtures/handwritten-api.d.ts.
+ * Type-only: nothing here emits code, so the default export stays the only export.
+ */
+export type Direction = 'normal' | 'reverse' | 'alternate';
+
+/** A single generated preset -- the shape every entry in `presets()` has. */
+export interface MotionSpec {
+  id: string;
+  label: string;
+  keyframes: Keyframe[];
+  /** base duration (ms) at 1x speed */
+  base: number;
+  direction: Direction;
+  /** Infinity for a looping preset, 1 for a one-shot family */
+  iterations: number;
+  once: boolean;
+  /** transform-origin applied before animating (swing/pendulum/rock) */
+  origin?: string;
+  /** true only for families that need real inline SVG paths (Draw) */
+  domOnly: boolean;
+  /** real stroke-draw: animates each child path's stroke-dashoffset */
+  draw: boolean;
+  /** animates the element's child layers with a stagger, instead of the root */
+  perChild: boolean;
+  /** per-child delay (ms), for perChild/draw families */
+  stagger?: number;
+  /** the family id this preset variant was generated from */
+  family: string;
+}
+
+export interface PlayOptions {
+  /** logarithmic speed multiplier; 1 = base duration */
+  speed?: number;
+  /** overrides the computed duration entirely (ms) */
+  duration?: number;
+  /** a named easing (spring/back/...), a raw cubic-bezier()/steps()/linear/ease* value, or a name registered via registerEasing */
+  easing?: string;
+  delay?: number;
+  /** Infinity to loop; overrides the preset's own iteration count */
+  iterations?: number | 'infinite';
+  direction?: Direction;
+  /** per-child stagger override (ms), for perChild/draw families */
+  stagger?: number;
+}
+
+export interface MotionConfigDefaults {
+  duration?: number | null;
+  easing?: string;
+  delay?: number;
+  iterations?: number | null;
+  direction?: Direction | null;
+  speed?: number;
+  trigger?: 'load' | 'loop' | 'hover' | 'click' | 'visible';
+}
+
+export interface MotionConfig {
+  defaults?: MotionConfigDefaults;
+  /** 'off': ignore Lottie JSON. 'import': convert via the optional ./lottie adapter. 'full': hand off to a supplied lottie-web player. */
+  lottie?: 'off' | 'import' | 'full';
+  /** a lottie-web instance you provide; this library never fetches one itself */
+  lottiePlayer?: unknown;
+  /** 'respect' (default): honour prefers-reduced-motion and [data-reduce-motion]. 'off': ignore it. */
+  reduceMotion?: 'respect' | 'off';
+}
+
+/** Bodymovin/Lottie JSON, detected by animate() via its layers/v/ip fields. */
+export interface LottieJSON {
+  v: string;
+  ip: number;
+  layers: unknown[];
+  [key: string]: unknown;
+}
+
+export interface FamilySpec {
+  id: string;
+  label: string;
+  base: number;
+  kf: (amp: number) => Keyframe[];
+  origin?: string;
+  once?: boolean;
+  domOnly?: boolean;
+  perChild?: boolean;
+  draw?: boolean;
+  stagger?: number;
+}
+
+export interface VariantSpec {
+  s: string;
+  a: number;
+  d: number;
+  r: boolean;
+}
+
+/**
+ * What `playSpec()`/`fromJSON()` actually read at runtime: `keyframes` plus
+ * whichever timing hints are present. Every other `MotionSpec` field
+ * (`id`/`label`/`once`/`domOnly`/`draw`/`perChild`/`family`) is ignored --
+ * those only matter to `play()`'s id-based routing.
+ */
+export interface PlaySpec {
+  keyframes: Keyframe[];
+  /** takes precedence over `base` when both are present */
+  duration?: number;
+  base?: number;
+  direction?: Direction;
+  origin?: string;
+}
+
+export interface IchavaMotionApi {
+  readonly version: string;
+
+  /** Merge partial config over the current settings (prototype-pollution-safe). Returns `this` for chaining. */
+  config(overrides: MotionConfig): IchavaMotionApi;
+
+  /** Route by content: a registered preset id, our MotionSpec JSON, or bodymovin/Lottie JSON. */
+  animate(el: Element | string, source: string | MotionSpec | LottieJSON, opts?: PlayOptions): Animation | null;
+
+  /** Play a registered preset by id. Handles perChild/draw routing internally. Returns null if unregistered, reduced-motion, or the id has no keyframes. */
+  play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null;
+
+  /** Play a raw spec directly -- no id lookup, no perChild/draw routing (single-element only). */
+  playSpec(el: Element | string, spec: PlaySpec, opts?: PlayOptions): Animation | null;
+
+  /** Play a plain JSON definition ({keyframes, duration|base, easing, direction, iterations}). `{trigger:'loop'}` loops it. */
+  fromJSON(el: Element | string, def: PlaySpec, opts?: PlayOptions & { trigger?: 'loop' }): Animation | null;
+
+  /** Declaratively wire every `[data-ichava-motion]` element under `root` (default: document). */
+  auto(root?: ParentNode): void;
+
+  /** The full generated preset registry, keyed by id. */
+  presets(): Record<string, MotionSpec>;
+  presetIds(): string[];
+
+  /** Named easing -> WAAPI value map (spring/back/steps(8)/...). */
+  easings(): Record<string, string>;
+
+  /** Register (or overwrite) one preset directly. Returns `this` for chaining. */
+  register(id: string, spec: Partial<MotionSpec>): IchavaMotionApi;
+
+  /** Add a family; regenerates the full preset registry against every existing variant. Returns `this` for chaining. */
+  registerFamily(family: FamilySpec): IchavaMotionApi;
+
+  /** Add a variant; regenerates the full preset registry against every existing family. Returns `this` for chaining. */
+  registerVariant(variant: VariantSpec): IchavaMotionApi;
+
+  /** Register a named easing (e.g. 'elastic' -> a cubic-bezier() value). */
+  registerEasing(name: string, value: string): IchavaMotionApi;
+
+  /**
+   * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
+   * Off by default (WCAG 2.2.2): merely loading the script must not start looping
+   * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
+   */
+  autoInit(): IchavaMotionApi;
+}
+
+/* ─── internal types ─────────────────────────────────────────────────────── */
+
+/** What `timing()` reads: a played spec plus the hints a registered preset may carry. */
+interface TimedSpec extends PlaySpec {
+  iterations?: number | 'infinite';
+  easing?: string;
+}
+
+interface Config {
+  defaults: MotionConfigDefaults;
+  lottie: NonNullable<MotionConfig['lottie']>;
+  lottiePlayer: unknown;
+  reduceMotion: NonNullable<MotionConfig['reduceMotion']>;
+}
+
+interface LottiePlayer {
+  loadAnimation(params: { container: Element; renderer: string; loop: boolean; autoplay: boolean; animationData: unknown }): unknown;
+}
+
+/** The globals a page may provide: the optional Lottie adapter and a lottie-web player. */
+interface LottieGlobals {
+  IchavaMotionLottie?: { toSpec(json: LottieJSON): PlaySpec | null };
+  lottie?: LottiePlayer;
+}
+
   var VERSION = '1.0.0';
 
   /* ─── easings (label ↔ value; value is what WAAPI receives) ─────────────── */
-  var EASINGS = {
+  var EASINGS: Record<string, string> = {
     linear: 'linear', ease: 'ease', 'ease-in': 'ease-in', 'ease-out': 'ease-out', 'ease-in-out': 'ease-in-out',
     spring: 'cubic-bezier(.34,1.56,.64,1)', back: 'cubic-bezier(.68,-.55,.27,1.55)', 'steps(8)': 'steps(8)',
     'ease-in-quad': 'cubic-bezier(.55,.06,.68,.19)', 'ease-out-cubic': 'cubic-bezier(.22,.61,.36,1)'
   };
-  function resolveEasing(e) {
+  function resolveEasing(e?: string | null): string {
     if (!e) return 'ease-in-out';
-    if (EASINGS[e]) return EASINGS[e];
+    if (EASINGS[e]) return EASINGS[e]!;
     // pass raw cubic-bezier()/steps()/named through if valid
     if (/^(linear|ease(-in|-out|-in-out)?|step-(start|end)|steps\([^)]+\)|cubic-bezier\(\s*-?\d*\.?\d+\s*(,\s*-?\d*\.?\d+\s*){3}\))$/.test(String(e).trim())) return e;
     return 'ease-in-out';
@@ -32,63 +215,63 @@
 
   /* ─── family × variant preset generator (mirrors the app's MotionEngine) ── */
   var P = 'perspective(400px)';
-  var VARIANTS = [
+  var VARIANTS: VariantSpec[] = [
     { s: '', a: 1, d: 1, r: false }, { s: ' · Reverse', a: 1, d: 1, r: true },
     { s: ' · Subtle', a: 0.55, d: 1.15, r: false }, { s: ' · Subtle · Reverse', a: 0.55, d: 1.15, r: true },
     { s: ' · Bold', a: 1.7, d: 0.8, r: false }, { s: ' · Bold · Reverse', a: 1.7, d: 0.8, r: true }
   ];
-  var FAMILIES = [
+  var FAMILIES: FamilySpec[] = [
     { id: 'spin', label: 'Spin', base: 1400, kf: function () { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }]; } },
     { id: 'spin-y', label: 'Spin Y', base: 1600, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
     { id: 'spin-z', label: 'Spin Z', base: 1600, kf: function () { return [{ transform: P + ' rotateZ(0deg) rotateX(20deg)' }, { transform: P + ' rotateZ(360deg) rotateX(20deg)' }]; } },
     { id: 'flip-x', label: 'Flip X', base: 1400, kf: function () { return [{ transform: P + ' rotateX(0deg)' }, { transform: P + ' rotateX(360deg)' }]; } },
     { id: 'flip-y', label: 'Flip Y', base: 1400, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
-    { id: 'roll', label: 'Roll', base: 1200, kf: function (a) { return [{ transform: 'translateX(' + (-24 * a) + '%) rotate(' + (-120 * a) + 'deg)', opacity: 0.4 }, { transform: 'translateX(0) rotate(0)', opacity: 1 }]; } },
-    { id: 'orbit', label: 'Orbit', base: 2000, kf: function (a) { return [{ transform: 'rotate(0deg) translateX(' + (6 * a) + 'px) rotate(0deg)' }, { transform: 'rotate(360deg) translateX(' + (6 * a) + 'px) rotate(-360deg)' }]; } },
-    { id: 'pulse', label: 'Pulse', base: 1200, kf: function (a) { return [{ opacity: 1 }, { opacity: Math.max(0.1, 1 - 0.65 * a) }, { opacity: 1 }]; } },
-    { id: 'heartbeat', label: 'Heartbeat', base: 1000, kf: function (a) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.18 * a) + ')' }, { transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.12 * a) + ')' }, { transform: 'scale(1)' }]; } },
-    { id: 'breathe', label: 'Breathe', base: 3000, kf: function (a) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.08 * a) + ')' }, { transform: 'scale(1)' }]; } },
-    { id: 'zoom-in', label: 'Zoom In', base: 900, once: true, kf: function (a) { return [{ transform: 'scale(' + (1 - 0.4 * a) + ')', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }]; } },
-    { id: 'zoom-out', label: 'Zoom Out', base: 900, once: true, kf: function (a) { return [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(' + (1 + 0.4 * a) + ')', opacity: 0 }]; } },
-    { id: 'pop', label: 'Pop', base: 500, once: true, kf: function (a) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ')' }, { transform: 'scale(1)' }]; } },
-    { id: 'rubber-band', label: 'Rubber Band', base: 900, once: true, kf: function (a) { return [{ transform: 'scale(1,1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ',' + (1 - 0.25 * a) + ')' }, { transform: 'scale(' + (1 - 0.15 * a) + ',' + (1 + 0.15 * a) + ')' }, { transform: 'scale(1,1)' }]; } },
-    { id: 'jello', label: 'Jello', base: 900, once: true, kf: function (a) { return [{ transform: 'skewX(0) skewY(0)' }, { transform: 'skewX(' + (-12 * a) + 'deg) skewY(' + (-12 * a) + 'deg)' }, { transform: 'skewX(' + (6 * a) + 'deg) skewY(' + (6 * a) + 'deg)' }, { transform: 'skewX(0) skewY(0)' }]; } },
-    { id: 'tada', label: 'Tada', base: 1000, once: true, kf: function (a) { return [{ transform: 'scale(1) rotate(0)' }, { transform: 'scale(' + (1 - 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (3 * a) + 'deg)' }, { transform: 'scale(1) rotate(0)' }]; } },
-    { id: 'bounce', label: 'Bounce', base: 900, kf: function (a) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-22 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
-    { id: 'float', label: 'Float', base: 2400, kf: function (a) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-12 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
-    { id: 'hop', label: 'Hop', base: 800, kf: function (a) { return [{ transform: 'translateY(0) scaleY(1)' }, { transform: 'translateY(0) scaleY(0.86)' }, { transform: 'translateY(' + (-24 * a) + '%) scaleY(1.05)' }, { transform: 'translateY(0) scaleY(1)' }]; } },
-    { id: 'slide-up', label: 'Slide Up', base: 900, once: true, kf: function (a) { return [{ transform: 'translateY(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
-    { id: 'slide-down', label: 'Slide Down', base: 900, once: true, kf: function (a) { return [{ transform: 'translateY(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
-    { id: 'slide-left', label: 'Slide Left', base: 900, once: true, kf: function (a) { return [{ transform: 'translateX(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
-    { id: 'slide-right', label: 'Slide Right', base: 900, once: true, kf: function (a) { return [{ transform: 'translateX(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
-    { id: 'shake-x', label: 'Shake X', base: 600, kf: function (a) { return [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-3 * a) + 'px)' }, { transform: 'translateX(' + (3 * a) + 'px)' }, { transform: 'translateX(0)' }]; } },
-    { id: 'shake-y', label: 'Shake Y', base: 600, kf: function (a) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-3 * a) + 'px)' }, { transform: 'translateY(' + (3 * a) + 'px)' }, { transform: 'translateY(0)' }]; } },
-    { id: 'vibrate', label: 'Vibrate', base: 300, kf: function (a) { return [{ transform: 'translate(0,0)' }, { transform: 'translate(' + (-1.5 * a) + 'px,' + (1.5 * a) + 'px)' }, { transform: 'translate(' + (1.5 * a) + 'px,' + (-1.5 * a) + 'px)' }, { transform: 'translate(0,0)' }]; } },
-    { id: 'wobble', label: 'Wobble', base: 1000, once: true, kf: function (a) { return [{ transform: 'translateX(0) rotate(0)' }, { transform: 'translateX(' + (-12 * a) + '%) rotate(' + (-5 * a) + 'deg)' }, { transform: 'translateX(' + (8 * a) + '%) rotate(' + (3 * a) + 'deg)' }, { transform: 'translateX(0) rotate(0)' }]; } },
-    { id: 'wiggle', label: 'Wiggle', base: 800, kf: function (a) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-11 * a) + 'deg)' }, { transform: 'rotate(' + (11 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
-    { id: 'swing', label: 'Swing', base: 1000, origin: 'top center', kf: function (a) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (15 * a) + 'deg)' }, { transform: 'rotate(' + (-10 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
-    { id: 'pendulum', label: 'Pendulum', base: 1600, origin: 'top center', kf: function (a) { return [{ transform: 'rotate(' + (-20 * a) + 'deg)' }, { transform: 'rotate(' + (20 * a) + 'deg)' }, { transform: 'rotate(' + (-20 * a) + 'deg)' }]; } },
-    { id: 'rock', label: 'Rock', base: 1200, origin: 'bottom center', kf: function (a) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-8 * a) + 'deg)' }, { transform: 'rotate(' + (8 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
-    { id: 'fade', label: 'Fade', base: 1400, kf: function (a) { return [{ opacity: Math.max(0, 1 - a) }, { opacity: 1 }]; } },
+    { id: 'roll', label: 'Roll', base: 1200, kf: function (a: number) { return [{ transform: 'translateX(' + (-24 * a) + '%) rotate(' + (-120 * a) + 'deg)', opacity: 0.4 }, { transform: 'translateX(0) rotate(0)', opacity: 1 }]; } },
+    { id: 'orbit', label: 'Orbit', base: 2000, kf: function (a: number) { return [{ transform: 'rotate(0deg) translateX(' + (6 * a) + 'px) rotate(0deg)' }, { transform: 'rotate(360deg) translateX(' + (6 * a) + 'px) rotate(-360deg)' }]; } },
+    { id: 'pulse', label: 'Pulse', base: 1200, kf: function (a: number) { return [{ opacity: 1 }, { opacity: Math.max(0.1, 1 - 0.65 * a) }, { opacity: 1 }]; } },
+    { id: 'heartbeat', label: 'Heartbeat', base: 1000, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.18 * a) + ')' }, { transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.12 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'breathe', label: 'Breathe', base: 3000, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.08 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'zoom-in', label: 'Zoom In', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(' + (1 - 0.4 * a) + ')', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }]; } },
+    { id: 'zoom-out', label: 'Zoom Out', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(' + (1 + 0.4 * a) + ')', opacity: 0 }]; } },
+    { id: 'pop', label: 'Pop', base: 500, once: true, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'rubber-band', label: 'Rubber Band', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1,1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ',' + (1 - 0.25 * a) + ')' }, { transform: 'scale(' + (1 - 0.15 * a) + ',' + (1 + 0.15 * a) + ')' }, { transform: 'scale(1,1)' }]; } },
+    { id: 'jello', label: 'Jello', base: 900, once: true, kf: function (a: number) { return [{ transform: 'skewX(0) skewY(0)' }, { transform: 'skewX(' + (-12 * a) + 'deg) skewY(' + (-12 * a) + 'deg)' }, { transform: 'skewX(' + (6 * a) + 'deg) skewY(' + (6 * a) + 'deg)' }, { transform: 'skewX(0) skewY(0)' }]; } },
+    { id: 'tada', label: 'Tada', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'scale(1) rotate(0)' }, { transform: 'scale(' + (1 - 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (3 * a) + 'deg)' }, { transform: 'scale(1) rotate(0)' }]; } },
+    { id: 'bounce', label: 'Bounce', base: 900, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-22 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'float', label: 'Float', base: 2400, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-12 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'hop', label: 'Hop', base: 800, kf: function (a: number) { return [{ transform: 'translateY(0) scaleY(1)' }, { transform: 'translateY(0) scaleY(0.86)' }, { transform: 'translateY(' + (-24 * a) + '%) scaleY(1.05)' }, { transform: 'translateY(0) scaleY(1)' }]; } },
+    { id: 'slide-up', label: 'Slide Up', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateY(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
+    { id: 'slide-down', label: 'Slide Down', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateY(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
+    { id: 'slide-left', label: 'Slide Left', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
+    { id: 'slide-right', label: 'Slide Right', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
+    { id: 'shake-x', label: 'Shake X', base: 600, kf: function (a: number) { return [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-3 * a) + 'px)' }, { transform: 'translateX(' + (3 * a) + 'px)' }, { transform: 'translateX(0)' }]; } },
+    { id: 'shake-y', label: 'Shake Y', base: 600, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-3 * a) + 'px)' }, { transform: 'translateY(' + (3 * a) + 'px)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'vibrate', label: 'Vibrate', base: 300, kf: function (a: number) { return [{ transform: 'translate(0,0)' }, { transform: 'translate(' + (-1.5 * a) + 'px,' + (1.5 * a) + 'px)' }, { transform: 'translate(' + (1.5 * a) + 'px,' + (-1.5 * a) + 'px)' }, { transform: 'translate(0,0)' }]; } },
+    { id: 'wobble', label: 'Wobble', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'translateX(0) rotate(0)' }, { transform: 'translateX(' + (-12 * a) + '%) rotate(' + (-5 * a) + 'deg)' }, { transform: 'translateX(' + (8 * a) + '%) rotate(' + (3 * a) + 'deg)' }, { transform: 'translateX(0) rotate(0)' }]; } },
+    { id: 'wiggle', label: 'Wiggle', base: 800, kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-11 * a) + 'deg)' }, { transform: 'rotate(' + (11 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'swing', label: 'Swing', base: 1000, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (15 * a) + 'deg)' }, { transform: 'rotate(' + (-10 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'pendulum', label: 'Pendulum', base: 1600, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(' + (-20 * a) + 'deg)' }, { transform: 'rotate(' + (20 * a) + 'deg)' }, { transform: 'rotate(' + (-20 * a) + 'deg)' }]; } },
+    { id: 'rock', label: 'Rock', base: 1200, origin: 'bottom center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-8 * a) + 'deg)' }, { transform: 'rotate(' + (8 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'fade', label: 'Fade', base: 1400, kf: function (a: number) { return [{ opacity: Math.max(0, 1 - a) }, { opacity: 1 }]; } },
     { id: 'blink', label: 'Blink', base: 1000, kf: function () { return [{ opacity: 1 }, { opacity: 1 }, { opacity: 0 }, { opacity: 0 }, { opacity: 1 }]; } },
     { id: 'flash', label: 'Flash', base: 1000, once: true, kf: function () { return [{ opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }]; } },
-    { id: 'glow', label: 'Glow', base: 1600, kf: function (a) { return [{ filter: 'drop-shadow(0 0 0 currentColor)' }, { filter: 'drop-shadow(0 0 ' + (5 * a) + 'px currentColor)' }, { filter: 'drop-shadow(0 0 0 currentColor)' }]; } },
+    { id: 'glow', label: 'Glow', base: 1600, kf: function (a: number) { return [{ filter: 'drop-shadow(0 0 0 currentColor)' }, { filter: 'drop-shadow(0 0 ' + (5 * a) + 'px currentColor)' }, { filter: 'drop-shadow(0 0 0 currentColor)' }]; } },
     { id: 'draw', label: 'Draw', base: 1400, once: true, domOnly: true, draw: true, stagger: 120, kf: function () { return [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }]; } },
     /* illustration families — animate the SVG's child layers, not just the root */
-    { id: 'reveal', label: 'Reveal', base: 700, once: true, perChild: true, stagger: 90, kf: function (a) { return [{ opacity: 0, transform: 'translateY(' + (14 * a) + 'px)' }, { opacity: 1, transform: 'translateY(0)' }]; } },
-    { id: 'cascade', label: 'Cascade', base: 700, once: true, perChild: true, stagger: 110, kf: function (a) { return [{ opacity: 0, transform: 'scale(' + (1 - 0.3 * a) + ')' }, { opacity: 1, transform: 'scale(1)' }]; } },
-    { id: 'assemble', label: 'Assemble', base: 800, once: true, perChild: true, stagger: 90, kf: function (a) { return [{ opacity: 0, transform: 'translateX(' + (-18 * a) + 'px) rotate(' + (-8 * a) + 'deg)' }, { opacity: 1, transform: 'translateX(0) rotate(0)' }]; } },
-    { id: 'parallax', label: 'Parallax', base: 2600, perChild: true, stagger: 160, kf: function (a) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-7 * a) + 'px)' }, { transform: 'translateY(0)' }]; } }
+    { id: 'reveal', label: 'Reveal', base: 700, once: true, perChild: true, stagger: 90, kf: function (a: number) { return [{ opacity: 0, transform: 'translateY(' + (14 * a) + 'px)' }, { opacity: 1, transform: 'translateY(0)' }]; } },
+    { id: 'cascade', label: 'Cascade', base: 700, once: true, perChild: true, stagger: 110, kf: function (a: number) { return [{ opacity: 0, transform: 'scale(' + (1 - 0.3 * a) + ')' }, { opacity: 1, transform: 'scale(1)' }]; } },
+    { id: 'assemble', label: 'Assemble', base: 800, once: true, perChild: true, stagger: 90, kf: function (a: number) { return [{ opacity: 0, transform: 'translateX(' + (-18 * a) + 'px) rotate(' + (-8 * a) + 'deg)' }, { opacity: 1, transform: 'translateX(0) rotate(0)' }]; } },
+    { id: 'parallax', label: 'Parallax', base: 2600, perChild: true, stagger: 160, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-7 * a) + 'px)' }, { transform: 'translateY(0)' }]; } }
   ];
 
-  var PRESETS = {}; // id → { id, label, keyframes, base, direction, iterations, once, origin, domOnly }
-  function slugVariant(s) { return s ? '-' + s.replace(/[·\s]+/g, '').toLowerCase() : ''; }
-  function buildPresets() {
+  var PRESETS: Record<string, MotionSpec> = {}; // id → { id, label, keyframes, base, direction, iterations, once, origin, domOnly }
+  function slugVariant(s: string): string { return s ? '-' + s.replace(/[·\s]+/g, '').toLowerCase() : ''; }
+  function buildPresets(): void {
     PRESETS = {};
     for (var i = 0; i < FAMILIES.length; i++) {
-      var f = FAMILIES[i];
+      var f = FAMILIES[i]!;
       for (var j = 0; j < VARIANTS.length; j++) {
-        var v = VARIANTS[j];
+        var v = VARIANTS[j]!;
         var id = f.id + slugVariant(v.s);
         PRESETS[id] = {
           id: id, label: f.label + v.s, keyframes: f.kf(v.a), base: Math.round(f.base * v.d),
@@ -101,7 +284,7 @@
   buildPresets();
 
   /* ─── config ─────────────────────────────────────────────────────────────── */
-  var CONFIG = {
+  var CONFIG: Config = {
     defaults: { duration: null, easing: 'ease-in-out', delay: 0, iterations: null, direction: null, speed: 1, trigger: 'load' },
     lottie: 'off',        // 'off' | 'import' | 'full'
     lottiePlayer: null,   // a lottie-web instance you supply; never fetched for you
@@ -124,7 +307,8 @@
    */
   var BLOCKED_KEYS = ['__proto__', 'constructor', 'prototype'];
 
-  function assign(t) {
+  function assign(t: any, ...sources: any[]): any;
+  function assign(t: any): any {
     for (var i = 1; i < arguments.length; i++) {
       var s = arguments[i];
       if (!s) continue;
@@ -138,7 +322,7 @@
     return t;
   }
 
-  function reduceMotion() {
+  function reduceMotion(): boolean {
     if (CONFIG.reduceMotion === 'off') return false;
     /*
      * Fail CLOSED: when the preference cannot be read, assume it is set.
@@ -156,14 +340,14 @@
   }
 
   /* ─── player ─────────────────────────────────────────────────────────────── */
-  function toEl(target) { return typeof target === 'string' ? document.querySelector(target) : target; }
+  function toEl(target: Element | string | null): Element | null { return typeof target === 'string' ? document.querySelector(target) : target; }
 
   // Resolve WAAPI timing from a spec + opts (+ a per-child stagger delay).
-  function timing(spec, opts, extraDelay) {
+  function timing(spec: TimedSpec, opts: PlayOptions, extraDelay?: number): KeyframeAnimationOptions {
     var speed = opts.speed != null ? opts.speed : (CONFIG.defaults.speed || 1);
     var base = spec.duration != null ? spec.duration : spec.base;
     var duration = opts.duration != null ? opts.duration : Math.max(80, (base || 1000) / Math.max(0.1, speed));
-    var iterations = opts.iterations != null ? opts.iterations : (spec.iterations != null ? spec.iterations : (CONFIG.defaults.iterations != null ? CONFIG.defaults.iterations : Infinity));
+    var iterations: number | 'infinite' = opts.iterations != null ? opts.iterations : (spec.iterations != null ? spec.iterations : (CONFIG.defaults.iterations != null ? CONFIG.defaults.iterations : Infinity));
     if (iterations === 'infinite') iterations = Infinity;
     var dir = opts.direction || spec.direction || CONFIG.defaults.direction || 'normal';
     return {
@@ -176,16 +360,16 @@
     };
   }
 
-  function playSpec(el, spec, opts) {
+  function playSpec(el: Element | string | null, spec: TimedSpec | null | undefined, opts?: PlayOptions): Animation | null {
     el = toEl(el); if (!el || !spec || !spec.keyframes || !spec.keyframes.length) return null;
     if (reduceMotion()) return null;
     opts = opts || {};
-    if (spec.origin && el.style) el.style.transformOrigin = spec.origin;
+    if (spec.origin && (el as HTMLElement).style) (el as HTMLElement).style.transformOrigin = spec.origin;
     return el.animate(spec.keyframes, timing(spec, opts));
   }
 
   // The SVG's animatable layers (illustration groups / paths), for child-targeting.
-  function childLayers(el) {
+  function childLayers(el: Element): NodeListOf<Element> | HTMLCollection {
     var n = el.querySelectorAll('[data-layer]');
     if (n.length) return n;
     n = el.querySelectorAll(':scope > g, :scope > path');
@@ -193,28 +377,28 @@
   }
 
   // Staggered per-child animation — the illustration families (Reveal/Cascade/…).
-  function playChildren(el, spec, opts) {
+  function playChildren(el: Element, spec: MotionSpec, opts?: PlayOptions): Animation | null {
     opts = opts || {};
     var kids = childLayers(el);
     if (!kids || !kids.length) return playSpec(el, spec, opts);
     var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 90);
-    var last = null;
+    var last: Animation | null = null;
     for (var i = 0; i < kids.length; i++) {
-      if (spec.origin && kids[i].style) kids[i].style.transformOrigin = spec.origin;
-      last = kids[i].animate(spec.keyframes, timing(spec, opts, i * stagger));
+      if (spec.origin && (kids[i] as HTMLElement).style) (kids[i] as HTMLElement).style.transformOrigin = spec.origin;
+      last = kids[i]!.animate(spec.keyframes, timing(spec, opts, i * stagger));
     }
     return last;
   }
 
   // Real "Draw": measure each child path and animate its stroke-dashoffset to 0.
-  function drawPaths(el, spec, opts) {
+  function drawPaths(el: Element, spec: MotionSpec, opts?: PlayOptions): Animation | null {
     opts = opts || {};
-    var paths = el.querySelectorAll('path, line, polyline, polygon, circle, rect');
+    var paths = el.querySelectorAll<SVGGeometryElement>('path, line, polyline, polygon, circle, rect');
     if (!paths.length) return playSpec(el, spec, opts);
     var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 120);
-    var last = null, drawn = 0;
+    var last: Animation | null = null, drawn = 0;
     for (var i = 0; i < paths.length; i++) {
-      var p = paths[i], len = 0;
+      var p = paths[i]!, len = 0;
       try { len = p.getTotalLength ? p.getTotalLength() : 0; } catch (e) { len = 0; }
       if (!len) continue;
       p.style.strokeDasharray = String(len);
@@ -224,7 +408,7 @@
     return last;
   }
 
-  function play(el, presetId, opts) {
+  function play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null {
     var spec = PRESETS[presetId];
     if (!spec) { return null; }
     var node = toEl(el); if (!node) return null;
@@ -235,19 +419,19 @@
   }
 
   // route by content: preset id | our JSON | bodymovin JSON (via Lottie tier)
-  function animate(el, source, opts) {
+  function animate(el: Element | string, source: string | MotionSpec | PlaySpec | LottieJSON, opts?: PlayOptions): Animation | null {
     if (typeof source === 'string') return play(el, source, opts);
-    if (source && source.layers && source.v && source.ip != null) return runLottie(el, source, opts);
-    return playSpec(el, source, opts); // our JSON schema
+    if (source && (source as LottieJSON).layers && (source as LottieJSON).v && (source as LottieJSON).ip != null) return runLottie(el, source as LottieJSON, opts);
+    return playSpec(el, source as PlaySpec, opts); // our JSON schema
   }
 
-  function runLottie(el, json, opts) {
-    if (CONFIG.lottie === 'import' && window.IchavaMotionLottie) {
-      var spec = window.IchavaMotionLottie.toSpec(json);
+  function runLottie(el: Element | string, json: LottieJSON, opts?: PlayOptions): Animation | null {
+    if (CONFIG.lottie === 'import' && (window as LottieGlobals).IchavaMotionLottie) {
+      var spec = (window as LottieGlobals).IchavaMotionLottie!.toSpec(json);
       if (spec) return playSpec(el, spec, opts);
     }
     if (CONFIG.lottie === 'full') { return loadLottieWeb(toEl(el), json); }
-    if (window.IchavaMotionLottie) { var s = window.IchavaMotionLottie.toSpec(json); if (s) return playSpec(el, s, opts); }
+    if ((window as LottieGlobals).IchavaMotionLottie) { var s = (window as LottieGlobals).IchavaMotionLottie!.toSpec(json); if (s) return playSpec(el, s, opts); }
     return null; // lottie disabled
   }
 
@@ -274,13 +458,13 @@
    */
   var lottieWarned = false;
 
-  function resolveLottiePlayer() {
-    if (CONFIG.lottiePlayer) return CONFIG.lottiePlayer;
-    if (typeof window !== 'undefined' && window.lottie) return window.lottie;
+  function resolveLottiePlayer(): LottiePlayer | null {
+    if (CONFIG.lottiePlayer) return CONFIG.lottiePlayer as LottiePlayer;
+    if (typeof window !== 'undefined' && (window as LottieGlobals).lottie) return (window as LottieGlobals).lottie!;
     return null;
   }
 
-  function loadLottieWeb(el, json) {
+  function loadLottieWeb(el: Element | null, json: LottieJSON): null {
     if (!el) return null;
 
     var lottie = resolveLottiePlayer();
@@ -304,25 +488,25 @@
   }
 
   /* ─── declarative auto-init (data-*) ─────────────────────────────────────── */
-  function readOpts(el) {
+  function readOpts(el: HTMLElement): PlayOptions {
     var d = el.dataset;
-    var o = {};
+    var o: PlayOptions = {};
     if (d.motionSpeed) o.speed = parseFloat(d.motionSpeed);
     if (d.motionEasing) o.easing = d.motionEasing;
     if (d.motionDelay) o.delay = parseFloat(d.motionDelay);
-    if (d.motionDirection) o.direction = d.motionDirection;
+    if (d.motionDirection) o.direction = d.motionDirection as Direction;
     if (d.motionIterations) o.iterations = d.motionIterations === 'infinite' ? Infinity : parseFloat(d.motionIterations);
     if (d.motionStagger) o.stagger = parseFloat(d.motionStagger);
     return o;
   }
-  var wired = new WeakSet();
-  function wire(el) {
+  var wired = new WeakSet<Element>();
+  function wire(el: Element): void {
     if (wired.has(el)) return; wired.add(el);
-    var id = el.getAttribute('data-ichava-motion');
+    var id = el.getAttribute('data-ichava-motion') as string;
     var trigger = el.getAttribute('data-motion-trigger') || CONFIG.defaults.trigger || 'load';
-    var opts = readOpts(el);
-    var current = null;
-    function start(o) { if (current) current.cancel(); current = play(el, id, o || opts); return current; }
+    var opts = readOpts(el as HTMLElement);
+    var current: Animation | null = null;
+    function start(o?: PlayOptions) { if (current) current.cancel(); current = play(el, id, o || opts); return current; }
     if (trigger === 'load') { start(); }
     else if (trigger === 'loop') { start({ iterations: Infinity }); }
     else if (trigger === 'hover') {
@@ -332,12 +516,12 @@
       el.addEventListener('click', function () { if (current && current.playState === 'running') current.cancel(); else start(); });
     } else if (trigger === 'visible') {
       if ('IntersectionObserver' in window) {
-        var io = new IntersectionObserver(function (entries) { entries.forEach(function (e) { if (e.isIntersecting) { start({ iterations: PRESETS[id] && PRESETS[id].once ? 1 : opts.iterations }); io.unobserve(el); } }); });
+        var io = new IntersectionObserver(function (entries) { entries.forEach(function (e) { if (e.isIntersecting) { start({ iterations: PRESETS[id] && PRESETS[id]!.once ? 1 : opts.iterations }); io.unobserve(el); } }); });
         io.observe(el);
       } else start();
     }
   }
-  function auto(root) {
+  function auto(root?: ParentNode): void {
     (root || document).querySelectorAll('[data-ichava-motion]').forEach(wire);
   }
 
@@ -359,7 +543,7 @@
     registerFamily: function (family) { FAMILIES.push(family); buildPresets(); return this; },
     registerVariant: function (variant) { VARIANTS.push(variant); buildPresets(); return this; },
     registerEasing: function (name, value) { EASINGS[name] = value; return this; }
-  };
+  } as IchavaMotionApi;
 
 
 
@@ -368,7 +552,7 @@
  * this module in Node does not throw.
  */
 if (typeof globalThis !== 'undefined' && typeof globalThis.document !== 'undefined') {
-  globalThis.IchavaMotion = IchavaMotion;
+  (globalThis as typeof globalThis & { IchavaMotion?: IchavaMotionApi }).IchavaMotion = IchavaMotion;
 }
 
 /*
@@ -387,7 +571,7 @@ if (typeof globalThis !== 'undefined' && typeof globalThis.document !== 'undefin
  * `prefersReduced()` is still honoured inside `auto()`, so even an explicit opt-in does
  * nothing for a user who asked for less motion.
  */
-IchavaMotion.autoInit = function autoInit() {
+IchavaMotion.autoInit = function autoInit(): IchavaMotionApi {
   if (typeof document === 'undefined') return IchavaMotion;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { auto(); });

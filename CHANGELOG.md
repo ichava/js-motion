@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Changed
+
+- CI tests on Node 24 and 26 (the newest release), up from 22 and 24, and the single-version jobs and the release run on 24, the active LTS.
+
 ## [0.1.2] - 2026-10-23
 
 ### Fixed

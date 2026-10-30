@@ -171,8 +171,8 @@
       "family": "spin-y"
     },
     {
-      "id": "spin-z",
-      "label": "Spin Z",
+      "id": "spin-tilt",
+      "label": "Spin Tilt",
       "base": 1600,
       "direction": "normal",
       "once": false,
@@ -180,11 +180,11 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
-      "id": "spin-z-reverse",
-      "label": "Spin Z · Reverse",
+      "id": "spin-tilt-reverse",
+      "label": "Spin Tilt · Reverse",
       "base": 1600,
       "direction": "reverse",
       "once": false,
@@ -192,11 +192,11 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
-      "id": "spin-z-subtle",
-      "label": "Spin Z · Subtle",
+      "id": "spin-tilt-subtle",
+      "label": "Spin Tilt · Subtle",
       "base": 1840,
       "direction": "normal",
       "once": false,
@@ -204,11 +204,11 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
-      "id": "spin-z-subtlereverse",
-      "label": "Spin Z · Subtle · Reverse",
+      "id": "spin-tilt-subtlereverse",
+      "label": "Spin Tilt · Subtle · Reverse",
       "base": 1840,
       "direction": "reverse",
       "once": false,
@@ -216,11 +216,11 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
-      "id": "spin-z-bold",
-      "label": "Spin Z · Bold",
+      "id": "spin-tilt-bold",
+      "label": "Spin Tilt · Bold",
       "base": 1280,
       "direction": "normal",
       "once": false,
@@ -228,11 +228,11 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
-      "id": "spin-z-boldreverse",
-      "label": "Spin Z · Bold · Reverse",
+      "id": "spin-tilt-boldreverse",
+      "label": "Spin Tilt · Bold · Reverse",
       "base": 1280,
       "direction": "reverse",
       "once": false,
@@ -240,7 +240,7 @@
       "domOnly": false,
       "perChild": false,
       "draw": false,
-      "family": "spin-z"
+      "family": "spin-tilt"
     },
     {
       "id": "flip-x",

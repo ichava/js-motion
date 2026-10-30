@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const FAMILIES = [
-  ['spin', 'Spin', 1400], ['spin-y', 'Spin Y', 1600], ['spin-z', 'Spin Z', 1600],
+  ['spin', 'Spin', 1400], ['spin-y', 'Spin Y', 1600], ['spin-tilt', 'Spin Tilt', 1600],
   ['flip-x', 'Flip X', 1400], ['flip-y', 'Flip Y', 1400], ['roll', 'Roll', 1200], ['orbit', 'Orbit', 2000],
   ['pulse', 'Pulse', 1200], ['heartbeat', 'Heartbeat', 1000], ['breathe', 'Breathe', 3000],
   ['zoom-in', 'Zoom In', 900, true], ['zoom-out', 'Zoom Out', 900, true], ['pop', 'Pop', 500, true],

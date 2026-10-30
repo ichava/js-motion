@@ -79,8 +79,8 @@ var IchavaMotion = (function() {
 				}
 			},
 			{
-				id: "spin-z",
-				label: "Spin Z",
+				id: "spin-tilt",
+				label: "Spin Tilt",
 				base: 1600,
 				kf: function() {
 					return [{ transform: P + " rotateZ(0deg) rotateX(20deg)" }, { transform: P + " rotateZ(360deg) rotateX(20deg)" }];

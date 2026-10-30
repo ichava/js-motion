@@ -259,7 +259,7 @@ function createMotion(): IchavaMotionApi {
   var FAMILIES: FamilySpec[] = [
     { id: 'spin', label: 'Spin', base: 1400, kf: function () { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }]; } },
     { id: 'spin-y', label: 'Spin Y', base: 1600, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
-    { id: 'spin-z', label: 'Spin Z', base: 1600, kf: function () { return [{ transform: P + ' rotateZ(0deg) rotateX(20deg)' }, { transform: P + ' rotateZ(360deg) rotateX(20deg)' }]; } },
+    { id: 'spin-tilt', label: 'Spin Tilt', base: 1600, kf: function () { return [{ transform: P + ' rotateZ(0deg) rotateX(20deg)' }, { transform: P + ' rotateZ(360deg) rotateX(20deg)' }]; } },
     { id: 'flip-x', label: 'Flip X', base: 1400, kf: function () { return [{ transform: P + ' rotateX(0deg)' }, { transform: P + ' rotateX(360deg)' }]; } },
     { id: 'flip-y', label: 'Flip Y', base: 1400, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
     { id: 'roll', label: 'Roll', base: 1200, kf: function (a: number) { return [{ transform: 'translateX(' + (-24 * a) + '%) rotate(' + (-120 * a) + 'deg)', opacity: 0.4 }, { transform: 'translateX(0) rotate(0)', opacity: 1 }]; } },

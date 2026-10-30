@@ -15,10 +15,10 @@ jq '{presets: (.presets|length), families: (.presets|map(.family)|unique|length)
 ```
 
 ```json
-{ "presets": 240, "families": 40, "count": 242 }
+{ "presets": 240, "families": 40, "count": 240 }
 ```
 
-`count` is 242 rather than 240 because of the two sentinels; see [Building a picker](#building-a-picker).
+`count` always equals the length of `presets`. The two picker sentinels are listed apart, under `sentinels`; see [Building a picker](#building-a-picker).
 
 ## The shape of an entry
 
@@ -79,8 +79,9 @@ import manifest from '@ichava/js-motion/presets'
 const families = [...new Set(manifest.presets.map(p => p.family))]
 ```
 
-Remember the two sentinels: `manifest.count` is 242 because it includes `None` and `JSON · Custom`,
-which a picker should offer but which are not animations.
+Remember the two sentinels: `manifest.sentinels` lists `None` and `JSON · Custom`, which a picker
+should offer but which are not animations. They are not in `presets` and not in `count`; until 0.1.x
+the manifest counted them, so `count` read 242 against 240 entries.
 
 ## Glow colour
 

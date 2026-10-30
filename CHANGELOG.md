@@ -11,6 +11,8 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 ### Changed
 
 - CI tests on Node 24 and 26 (the newest release), up from 22 and 24, and the single-version jobs and the release run on 24, the active LTS.
+- **CI fails when the committed `dist/` is not what the build produces** (release 0.1.0 finding XR-7). The `Build does not destroy committed output` job already compared the CSS, the JS bundles and the declarations; it now compares every file under `dist/` (source maps, the Lottie entry and `presets.json` included) and fails on a file the build creates that is not committed. Its stale comment, which still called the job an expected failure, now says what it guards.
+- **`dist/presets.json` reports `count: 240`, the number of presets it lists**, instead of 242 (release 0.1.0 finding M-15). The two picker sentinels that inflated it, `None` and `JSON · Custom`, are now listed under a new `sentinels` key. A consumer that read `count` as the picker size including the sentinels should add `sentinels.length`. `tests/presets-manifest.test.mjs` pins `count === presets.length` and that the manifest lists exactly the engine's preset ids; it fails on the old manifest.
 
 ## [0.1.2] - 2026-10-23
 

@@ -50,7 +50,10 @@ for (const [id, label, base, once = false, origin, domOnly = false, perChild = f
 
 const out = {
   version: '1.0.0',
-  count: presets.length + 2, // + None + JSON·Custom (engine sentinels)
+  // count is the length of `presets`, nothing else (release 0.1.0 finding M-15). The two
+  // picker sentinels, None and JSON · Custom, are not animations and are listed apart.
+  count: presets.length,
+  sentinels: ['None', 'JSON · Custom'],
   easings: ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'spring', 'back', 'steps(8)', 'ease-in-quad', 'ease-out-cubic'],
   variants: VARIANTS.map(([s]) => s || 'default'),
   presets,

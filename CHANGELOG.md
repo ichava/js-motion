@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Removed
+
+- **The deep-import shims `src/ichava-motion.js` and `src/ichava-motion.d.ts`**, deprecated in 0.1.1. They forwarded to `dist/` for a bundler that ignores the `exports` map; neither path was ever in `exports`. Import `@ichava/js-motion` instead. Their tests went with them, and `tests/package-surface.test.mjs` now fails if the `exports` map names anything outside `dist/` other than the Sass source, or if the packed tarball carries JavaScript or declarations under `src/`.
+
 ### Changed
 
 - CI tests on Node 24 and 26 (the newest release), up from 22 and 24, and the single-version jobs and the release run on 24, the active LTS.

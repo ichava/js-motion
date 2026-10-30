@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
-  "count": 242,
+  "count": 240,
+  "sentinels": [
+    "None",
+    "JSON · Custom"
+  ],
   "easings": [
     "linear",
     "ease",

@@ -61,16 +61,14 @@ jobs:
     timeout-minutes: 10
     # Drafts run nothing: CI starts when the pull request is marked ready.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    # EXPECTED TO FAIL until M2 is fixed in M-P1.
+    # dist/ is committed (consumers install from the git tag), so a source change
+    # merged without its rebuilt output ships stale code. This job rebuilds and fails
+    # on any difference anywhere under dist/, including a file the build creates that
+    # is not committed (release 0.1.0 finding XR-7).
     #
-    # src/ichava-motion.scss contains zero @keyframes and never invokes its own
-    # @mixin ichm, while the committed dist/ichava-motion.css carries 20
-    # @keyframes and 20 .ichm-* classes. So `npm run build` overwrites the whole
-    # CSS tier with a stub — and the script's trailing `|| true` reports success
-    # while doing it. The tier survives only because nobody runs the build.
-    #
-    # This job is the tripwire. Remove continue-on-error in M-P1, once the build
-    # generates the keyframes it currently deletes.
+    # History: it began as the M2 tripwire, when `npm run build` overwrote the whole
+    # CSS tier with a stub and reported success. That is fixed; the CSS checks below
+    # stay because they name the regression if it comes back.
     steps:
       - uses: actions/checkout@v7
 
@@ -100,6 +98,16 @@ jobs:
           # indistinguishable from a fresh one.
           git diff --exit-code -- dist/ichava-motion.js dist/ichava-motion.mjs dist/ichava-motion.cjs dist/ichava-motion.d.ts \
             || { echo "::error::npm run build rewrote a JS artifact or the declarations (M1). Commit the build output."; exit 1; }
+          # Everything else under dist/: source maps, the Lottie entry, presets.json,
+          # and any file the build creates that was never committed.
+          git diff --exit-code -- dist \
+            || { echo "::error::npm run build changed committed files under dist/. Run 'npm run build' and commit dist/."; exit 1; }
+          untracked=$(git ls-files --others --exclude-standard -- dist)
+          if [ -n "$untracked" ]; then
+            echo "::error::npm run build created files under dist/ that are not committed: $untracked"
+            exit 1
+          fi
+          echo "dist/: $(git ls-files -- dist | wc -l) committed files, all reproduced byte for byte"
 
   config-drift:
     name: Shared config matches the kernel

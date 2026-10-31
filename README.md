@@ -1,133 +1,83 @@
 # @ichava/js-motion
 
-A **framework-agnostic**, JSON-driven **SVG / icon animation engine**. Vanilla, **zero runtime
-dependencies**, self-contained (JS + CSS). Works in any project (React, Vue, plain HTML) via a
-`<script>` + `<link>`, or npm. Played through the **Web Animations API** with a **CSS-only** fallback.
-**240 presets across 40 families**, `data-*` auto-init, custom keyframes/easings, and an **opt-in
-Lottie** tier.
+[![Tests](https://github.com/ichava/js-motion/actions/workflows/ci.yml/badge.svg)](https://github.com/ichava/js-motion/actions/workflows/ci.yml)
+[![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **Version:** 0.1.2 · **License:** MIT · © 2026 Simtabi LLC <!-- x-release-please-version -->
+Two badges, not four: the package is not on npm (it installs from a git tag), so there is no
+registry version to show, and the type check runs in the same CI workflow as the tests.
 
----
+> A framework-agnostic, JSON-driven SVG and icon animation engine: zero runtime dependencies, Web Animations API with a CSS-only fallback, 240 presets across 40 families.
+
+Version 0.1.0. Runs in any modern browser; the build tooling needs Node 24 or newer. <!-- x-release-please-version -->
 
 ## Install
 
-```html
-<link rel="stylesheet" href="dist/ichava-motion.css" />
-<script src="dist/ichava-motion.js"></script>
+`@ichava/js-motion` is not published to npm; npm publishing is not set up. Install it from the git tag:
+
+```json
+{
+    "dependencies": {
+        "@ichava/js-motion": "github:ichava/js-motion#v0.1.0"
+    }
+}
 ```
 
-npm / CDN:
+The tag ships the built `dist/`, so nothing builds on install. Without a bundler, copy the two built
+files and load them with a `<link>` and a `<script>`; see [docs/installation.md](docs/installation.md).
+
+## Quick start guide and usage
+
+### Getting started
+
+Nothing to configure. Load the stylesheet once, and the CSS-only tier works with no JavaScript:
 
 ```js
 import IchavaMotion from '@ichava/js-motion';
 import '@ichava/js-motion/css';
-// or unpkg: https://unpkg.com/@ichava/js-motion/dist/ichava-motion.js
 ```
 
-## Three ways to animate
+### Usage
 
-**1 · CSS-only (no JS)**: add a class; the base families ship as `@keyframes`:
+A class runs a base family as CSS `@keyframes`:
 
 ```html
-<svg class="ichm-spin">…</svg>   <!-- or .ichm-pulse .ichm-bounce .ichm-heartbeat … -->
+<svg class="ichm-spin" viewBox="0 0 24 24">…</svg>
 ```
-Tune with CSS vars: `--ichm-duration`, `--ichm-easing`, `--ichm-iterations` (globally or per element), and `--ichm-glow-color` for the glow family (the icon's own colour when unset; set it to your accent to make the glow follow it).
 
-**2 · Declarative JS**: `data-*` on the element; `IchavaMotion.auto()` runs on load:
+`data-*` attributes describe an animation declaratively, and `IchavaMotion.autoInit()` wires them:
 
 ```html
-<svg data-ichava-motion="spin-bold"
-     data-motion-trigger="hover"      <!-- load | hover | click | visible | loop -->
-     data-motion-speed="1.5"
-     data-motion-easing="spring"
-     data-motion-delay="200"
-     data-motion-direction="reverse"
-     data-motion-iterations="3">…</svg>
+<svg data-ichava-motion="spin-bold" data-motion-trigger="hover" data-motion-speed="1.5">…</svg>
 ```
 
-**3 · Imperative**
+Or play a preset from code:
 
 ```js
-IchavaMotion.play(el, 'heartbeat', { speed: 1, easing: 'ease-in-out', delay: 0, iterations: 'infinite' });
-IchavaMotion.animate(el, { keyframes: [{transform:'rotate(0)'},{transform:'rotate(360deg)'}], duration: 1400, easing: 'linear', iterations: 'infinite' });
+IchavaMotion.play(el, 'heartbeat', { speed: 1, easing: 'ease-in-out', iterations: 'infinite' });
 ```
 
-`animate(el, source)` routes by content: a **preset id** → preset, an **our-schema JSON** → WAAPI, a
-**bodymovin/Lottie JSON** → the Lottie tier (see below).
-
-## Presets
-
-40 families × 6 variants (`default`, `· Reverse`, `· Subtle`, `· Subtle · Reverse`, `· Bold`,
-`· Bold · Reverse`) = **240**. Spin/Spin Y/Z, Flip X/Y, Roll, Orbit, Pulse, Heartbeat, Breathe, Zoom
-In/Out, Pop, Rubber Band, Jello, Tada, Bounce, Float, Hop, Slide ×4, Shake X/Y, Vibrate, Wobble, Wiggle,
-Swing, Pendulum, Rock, Fade, Blink, Flash, Glow, Draw, plus the illustration families below.
-`IchavaMotion.presetIds()` lists them; `dist/presets.json` is a shareable manifest
-(id · label · base · direction · once · family · perChild · draw).
-
-## Illustrations (layered SVGs)
-
-For multi-layer SVGs (spot illustrations), these families animate the SVG's **child layers** with a
-per-child stagger instead of moving the whole element:
-
-- **Reveal / Cascade / Assemble**: each layer fades/rises/scales/slides in, staggered.
-- **Parallax**: layers drift at a phase offset for depth.
-- **Draw**: measures each child `path` (`getTotalLength()`) and animates its `stroke-dashoffset` to 0.
-
-Mark the layers with `data-layer` (or use direct `<g>`/`<path>` children):
-
-```html
-<svg data-ichava-motion="reveal" data-motion-trigger="visible" data-motion-stagger="90">
-  <g data-layer>…</g>
-  <g data-layer>…</g>
-</svg>
-```
-
-`data-motion-stagger` (ms) overrides the per-child delay; multicolor fills are never touched.
-
-## Configure & extend
-
-```js
-IchavaMotion.config({
-  defaults: { easing: 'ease-in-out', speed: 1, trigger: 'load' },
-  lottie: 'off',          // 'off' | 'import' | 'full'
-  reduceMotion: 'respect' // 'respect' | 'off'
-});
-IchavaMotion.register('my-preset', { keyframes: [...], base: 800, iterations: 1 });
-IchavaMotion.registerEasing('snappy', 'cubic-bezier(.2,.8,.2,1)');
-IchavaMotion.registerFamily({ id: 'twirl', label: 'Twirl', base: 1000, kf: (a) => [...] }); // grows the variant set
-```
-Custom `cubic-bezier(...)` / `steps(...)` easings are accepted verbatim.
-
-`IchavaMotion` is one engine; `IchavaMotion.create()` makes another, with its own presets,
-easings and config, so two embeds on one page can configure motion separately:
-
-```js
-const motion = IchavaMotion.create().config({ reduceMotion: 'respect' }).registerEasing('snap', 'cubic-bezier(.2,1.4,.4,1)');
-motion.play(el, 'spin-subtle', { speed: 1.25 });
-```
-
-## Lottie (tiered and opt-in, so the core stays light)
-
-- `config({ lottie: 'off' })`: **default**; ignores bodymovin JSON. Core payload only.
-- `config({ lottie: 'import' })` + `<script src="dist/ichava-motion-lottie.js">`: maps **simple**
-  single-layer bodymovin (transform/opacity keyframes) → our schema, played via WAAPI. No shapes/masks.
-- `config({ lottie: 'full' })`: for arbitrary bodymovin, **lazy-loads `lottie-web`** on demand (fetched
-  only when a complex file is passed; not in the core bundle).
+The full walkthrough is in [docs/getting-started.md](docs/getting-started.md), the tour of every tier is
+in [docs/usage.md](docs/usage.md), and everything else is under [Documentation](#documentation).
 
 ## <a name="documentation"></a>Documentation
 
-- [Installation](docs/installation.md), the entry points and why this is not on npm
-- [Getting started](docs/getting-started.md), two classes, then what they do
-- [Presets](docs/presets.md), 240 across 40 families, and the manifest shape
-- [Architecture](docs/architecture.md), the three tiers and why they are separate
-- [Lottie](docs/lottie.md), the opt-in adapter and when it earns its size
-- [Release](docs/release.md), cutting a version
+### Guides
 
-## Accessibility
+- [Installation](docs/installation.md) — the entry points and why this is not on npm
+- [Getting started](docs/getting-started.md) — two classes, then what they do
+- [Usage](docs/usage.md) — the three ways to animate, illustrations, configuration, Lottie and reduced motion
+- [Architecture](docs/architecture.md) — the three tiers and why they are separate
+- [Release](docs/release.md) — cutting a version
 
-Honors `prefers-reduced-motion` (and a host `[data-reduce-motion]`) by not starting animations. Override
-with `config({ reduceMotion: 'off' })`.
+### Reference
+
+- [Presets](docs/presets.md) — 240 across 40 families, and the manifest shape
+- [Lottie](docs/lottie.md) — the opt-in adapter and when it earns its size
+
+## Contributing & security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License
-MIT © 2026 Simtabi LLC · https://simtabi.com · hello@simtabi.com
+
+MIT. Copyright (c) Simtabi LLC. See [LICENSE](LICENSE).

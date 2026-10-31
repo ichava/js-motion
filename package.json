@@ -1,10 +1,17 @@
 {
   "name": "@ichava/js-motion",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "description": "Framework-agnostic, JSON-driven SVG/icon animation engine. Vanilla, zero runtime dependencies, WAAPI + CSS, 240 presets across 40 families, data-* auto-init, optional Lottie import. Themable via CSS variables.",
   "license": "MIT",
-  "author": "Simtabi LLC <hello@simtabi.com> (https://simtabi.com)",
+  "author": "Simtabi LLC <opensource@simtabi.com> (https://simtabi.com)",
   "homepage": "https://opensource.simtabi.com/products/ichava/js-motion",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ichava/js-motion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ichava/js-motion/issues"
+  },
   "keywords": [
     "animation",
     "motion",
@@ -45,6 +52,12 @@
     "README.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "gen": "node scripts/gen-presets.mjs",
     "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build && tsc -p tsconfig.build.json",

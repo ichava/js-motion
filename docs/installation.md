@@ -25,7 +25,7 @@ The IIFE build assigns a global and needs nothing else:
 
 ```html
 <link rel="stylesheet" href="/path/to/ichava-motion.css">
-<script src="/path/to/ichava-motion.iife.js"></script>
+<script src="/path/to/ichava-motion.js"></script>
 ```
 
 ## What you get

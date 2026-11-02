@@ -1,0 +1,230 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    # ready_for_review: a draft runs nothing, so marking it ready must start the run.
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+  # The post-merge check. With CI on pull_request only, nothing re-runs after a merge,
+  # and with no lock file committed a dependency release that breaks main would stay
+  # invisible until an unrelated pull request went red. Weekly, Monday 10:00 UTC.
+  schedule:
+    - cron: '0 10 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24', '26']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No lockfile: this is a library, so it must not pin a resolution its
+      # consumers never use. npm install, not npm ci.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck the source
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Preset manifest is reproducible
+        run: |
+          npm run gen
+          git diff --exit-code -- dist/presets.json \
+            || { echo "::error::dist/presets.json is stale — run 'npm run gen' and commit."; exit 1; }
+
+  build-integrity:
+    name: Build does not destroy committed output
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # dist/ is committed (consumers install from the git tag), so a source change
+    # merged without its rebuilt output ships stale code. This job rebuilds and fails
+    # on any difference anywhere under dist/, including a file the build creates that
+    # is not committed (release 0.1.0 finding XR-7).
+    #
+    # History: it began as the M2 tripwire, when `npm run build` overwrote the whole
+    # CSS tier with a stub and reported success. That is fixed; the CSS checks below
+    # stay because they name the regression if it comes back.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Record the committed CSS
+        run: |
+          echo "keyframes committed: $(grep -c '@keyframes' dist/ichava-motion.css)"
+          echo "classes committed:   $(grep -c '\.ichm-' dist/ichava-motion.css)"
+
+      - name: Build
+        run: npm run build
+
+      - name: Assert the build changed nothing it should not have
+        run: |
+          echo "keyframes after build: $(grep -c '@keyframes' dist/ichava-motion.css || echo 0)"
+          git diff --exit-code -- dist/ichava-motion.css \
+            || { echo "::error::npm run build rewrote dist/ichava-motion.css (M2). The SCSS is not the source of the shipped CSS."; exit 1; }
+          # The JS artifacts have the same history: dist/ichava-motion.js used to be a
+          # hand copy of src/ with no build step behind it, so a stale artifact was
+          # indistinguishable from a fresh one.
+          git diff --exit-code -- dist/ichava-motion.js dist/ichava-motion.mjs dist/ichava-motion.cjs dist/ichava-motion.d.ts \
+            || { echo "::error::npm run build rewrote a JS artifact or the declarations (M1). Commit the build output."; exit 1; }
+          # Everything else under dist/: source maps, the Lottie entry, presets.json,
+          # and any file the build creates that was never committed.
+          git diff --exit-code -- dist \
+            || { echo "::error::npm run build changed committed files under dist/. Run 'npm run build' and commit dist/."; exit 1; }
+          untracked=$(git ls-files --others --exclude-standard -- dist)
+          if [ -n "$untracked" ]; then
+            echo "::error::npm run build created files under dist/ that are not committed: $untracked"
+            exit 1
+          fi
+          echo "dist/: $(git ls-files -- dist | wc -l) committed files, all reproduced byte for byte"
+
+  config-drift:
+    name: Shared config matches the kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # tsconfig.base.json and the drift-check script are copies of ichava/js-ui-kernel's
+    # config/. Fails when a copy stops matching the kernel's main, on a non-200 answer or
+    # an empty body; the second step proves it fails on a planted one-byte change.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Copies match the kernel
+        run: npm run check:config-drift
+
+      - name: A drifted copy fails the check
+        run: |
+          printf ' ' >> tsconfig.base.json
+          if npm run check:config-drift; then
+            echo "::error::the drift check passed on a modified copy, so it checks nothing"
+            exit 1
+          fi
+          git checkout -- tsconfig.base.json
+
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 5
+
+    # Nothing else reads these files until a tag is pushed. `release.yml` triggers
+    # on `push: tags`, so until now a broken workflow was first observed as a
+    # release that refused to start -- after the decision to release had been made.
+    #
+    # A YAML parse is not a substitute. `yaml.safe_load` accepts a duplicate key
+    # and silently keeps the last one, which is how a double-applied patch shipped
+    # a step carrying `continue-on-error:` twice and still validated clean.
+    # actionlint rejects what Actions rejects.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+
+  changelog:
+    runs-on: ubuntu-latest
+    # Drafts run nothing: CI starts when the pull request is marked ready.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 5
+    name: Changelog order
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # A misordered CHANGELOG still releases correctly, because release.yml
+      # finds a section by heading rather than by position -- so nothing else
+      # in this ecosystem catches it. Two packs had it: browser carried
+      # [Unreleased] below [0.2.7], and icon-sets-emoji had [0.2.6] filed
+      # between [0.1.1] and [0.1.0]. Closing [Unreleased] in place would have
+      # filed the new version underneath an older one.
+      - name: Check CHANGELOG section order
+        run: |
+          python3 - CHANGELOG.md <<'PYEOF'
+          import collections
+          import re, sys
+
+          path = sys.argv[1]
+          try:
+              text = open(path, encoding='utf-8').read()
+          except FileNotFoundError:
+              print(f'::error::{path} not found'); sys.exit(1)
+
+          heads = re.findall(r'^## \[([^\]]+)\]', text, re.M)
+          if not heads:
+              print(f'::error::{path} has no "## [version]" headings'); sys.exit(1)
+
+          def order_key(v):
+              nums = [int(n) for n in re.findall(r'\d+', v)[:3]]
+              return tuple(nums + [0] * (3 - len(nums)))
+
+          problems = []
+          # Duplicates first. Ordering says nothing about how many [Unreleased]
+          # headings there are, and release.yml extracts exactly one section by
+          # version heading: a second [Unreleased] means the next release
+          # publishes part of its notes and strands the rest under a heading no
+          # version will ever match. Four had accumulated here before anyone
+          # looked, and three other repos in the ecosystem had the same.
+          seen = [h for h, n in collections.Counter(heads).items() if n > 1]
+          if seen:
+              problems.append(
+                  'duplicate section headings: ' + ', '.join(f'[{h}]' for h in seen)
+                  + '. Each branch must add to the existing section, not prepend its own.')
+
+          if 'Unreleased' in heads and heads[0] != 'Unreleased':
+              problems.append(
+                  f'[Unreleased] is section {heads.index("Unreleased") + 1}, not the first. '
+                  'Closing it in place would file the new version below an older one.')
+
+          versions = [h for h in heads if h != 'Unreleased']
+          for older, newer in zip(versions, versions[1:]):
+              if order_key(older) < order_key(newer):
+                  problems.append(f'[{older}] is listed above [{newer}], but is the lower version.')
+
+          if problems:
+              print(f'::error::{path} sections are out of order:')
+              for p in problems:
+                  print(f'::error::  {p}')
+              sys.exit(1)
+
+          print(f'{path}: {len(heads)} sections, correctly ordered')
+          PYEOF

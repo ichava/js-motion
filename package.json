@@ -1,0 +1,76 @@
+{
+  "name": "@ichava/js-motion",
+  "version": "0.1.0",
+  "description": "Framework-agnostic, JSON-driven SVG/icon animation engine. Vanilla, zero runtime dependencies, WAAPI + CSS, 240 presets across 40 families, data-* auto-init, optional Lottie import. Themable via CSS variables.",
+  "license": "MIT",
+  "author": "Simtabi LLC <opensource@simtabi.com> (https://simtabi.com)",
+  "homepage": "https://opensource.simtabi.com/products/ichava/js-motion",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ichava/js-motion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ichava/js-motion/issues"
+  },
+  "keywords": [
+    "animation",
+    "motion",
+    "svg",
+    "icon",
+    "waapi",
+    "lottie",
+    "vanilla",
+    "framework-agnostic",
+    "css-animation",
+    "json"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "*.css",
+    "*.scss",
+    "./dist/ichava-motion.js"
+  ],
+  "main": "./dist/ichava-motion.cjs",
+  "style": "./dist/ichava-motion.css",
+  "unpkg": "./dist/ichava-motion.js",
+  "exports": {
+    ".": {
+      "types": "./dist/ichava-motion.d.ts",
+      "import": "./dist/ichava-motion.mjs",
+      "require": "./dist/ichava-motion.cjs",
+      "default": "./dist/ichava-motion.mjs"
+    },
+    "./css": "./dist/ichava-motion.css",
+    "./scss": "./src/ichava-motion.scss",
+    "./lottie": "./dist/ichava-motion-lottie.js",
+    "./presets": "./dist/presets.json",
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "gen": "node scripts/gen-presets.mjs",
+    "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build && tsc -p tsconfig.build.json",
+    "dev": "vite --open /demo/",
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "check:config-drift": "node scripts/check-config-drift.mjs tsconfig.base.json=config/tsconfig.base.json scripts/check-config-drift.mjs=config/check-config-drift.mjs"
+  },
+  "devDependencies": {
+    "sass": "^1.77.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  },
+  "module": "./dist/ichava-motion.mjs",
+  "jsdelivr": "./dist/ichava-motion.js"
+}

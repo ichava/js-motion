@@ -4,6 +4,11 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Added
+
+- `release.yml` can be dispatched by hand against a tag, as a recovery path when a tag push starts
+  nothing. A first step refuses any ref that is not a `vX.Y.Z` tag.
+
 ## [0.1.0] - TBD
 
 First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.

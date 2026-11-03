@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Changed
+
+- **The author and contact address is `ichava@simtabi.com`** (W-11, Sim 2026-11-03), replacing the community address `opensource@simtabi.com` wherever this repository named it. Vulnerability reports still go to `security@simtabi.com`.
+
 ### Added
 
 - `release.yml` can be dispatched by hand against a tag, as a recovery path when a tag push starts

@@ -4,6 +4,20 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Security
+
+- **Lottie `'full'` mode now needs `lottieFullAcknowledgeEvalRisk: true`** (S11). The full lottie-web build
+  evaluates expression fields with `eval`, and this engine treats animation JSON as arriving from anywhere.
+  Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change
+  for any host already using `'full'`: add the flag if every Lottie file you play is trusted.
+
+### Fixed
+
+- **A cancelled `draw` animation restores its strokes** (M1). `stroke-dasharray` and `stroke-dashoffset` were
+  left inline, so a cancelled preview stayed hidden.
+- **`transform-origin` is put back when an animation is cancelled** (M5, old M11). It was written inline for
+  `swing`, `pendulum` and `rock` and never restored, so it leaked into the next animation on that element.
+
 ### Changed
 
 - **Documentation links point at each repository's own `docs/`** (Sim, 2026-11-03: "all ichava repos have docs in their respective repos. thats by design"). Links to `opensource.simtabi.com/documentation/ichava/...` and the `opensource.simtabi.com/products/ichava/...` homepage, which answer 404 for every ichava page, now go to the matching `docs/*.md` on GitHub, or to the repository itself. Each target was checked to exist on that repository's `main`. The manifest's `homepage` and `support.docs` follow.
@@ -11,6 +25,14 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ### Added
 
+- **`GroupAnimation`**: `play()` of a group family (`reveal`, `cascade`, `draw`, any per-child preset)
+  returns one handle whose `cancel()`, `pause()`, `play()` and `finish()` reach every child, with the set in
+  `animations` (M2). The return is still the last child's `Animation`, so existing callers are unaffected;
+  a single-element play is unchanged.
+- **`lottieFullAcknowledgeEvalRisk`** config flag (S11) and a prominent warning in the README-linked docs and
+  `SECURITY.md`. See Security.
+- Provenance of `dist/ichava-motion-lottie.js` documented in `docs/lottie.md` with its sha256, and a test
+  pinning the checksum and the absence of `eval` surface (S12).
 - `release.yml` can be dispatched by hand against a tag, as a recovery path when a tag push starts
   nothing. A first step refuses any ref that is not a `vX.Y.Z` tag.
 

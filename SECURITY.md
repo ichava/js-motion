@@ -13,4 +13,6 @@ Acknowledgement within 48 hours.
 
 `@ichava/js-motion` runs in the browser and ships no runtime dependencies. The surface worth reporting
 is animation configuration reaching the DOM from untrusted input, and the Lottie adapter, which
-executes third-party animation data through a runtime the host supplies.
+executes third-party animation data through a runtime the host supplies. `lottie: 'full'` evaluates
+expressions in the animation file with `eval` (a property of the full lottie-web build), so it is inert
+unless the host sets `lottieFullAcknowledgeEvalRisk: true`; see [docs/lottie.md](docs/lottie.md).

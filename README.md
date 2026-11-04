@@ -56,6 +56,10 @@ Or play a preset from code:
 IchavaMotion.play(el, 'heartbeat', { speed: 1, easing: 'ease-in-out', iterations: 'infinite' });
 ```
 
+`play()` returns the animation, so a preview can `cancel()` it; a group preset returns one handle that
+cancels, pauses and finishes every child. Lottie `'full'` mode runs the animation file's expressions with
+`eval` and stays off until you opt in; see [docs/lottie.md](docs/lottie.md).
+
 The full walkthrough is in [docs/getting-started.md](docs/getting-started.md), the tour of every tier is
 in [docs/usage.md](docs/usage.md), and everything else is under [Documentation](#documentation).
 

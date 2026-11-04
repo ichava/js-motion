@@ -627,6 +627,7 @@ var IchavaMotion = (function() {
 			},
 			lottie: "off",
 			lottiePlayer: null,
+			lottieFullAcknowledgeEvalRisk: false,
 			reduceMotion: "respect"
 		};
 		var BLOCKED_KEYS = [
@@ -658,6 +659,38 @@ var IchavaMotion = (function() {
 		function toEl(target) {
 			return typeof target === "string" ? document.querySelector(target) : target;
 		}
+		function onCancel(anim, undo) {
+			if (anim && typeof anim.addEventListener === "function") anim.addEventListener("cancel", undo);
+			return anim;
+		}
+		function setInline(node, prop, value) {
+			var style = node.style, prev = style[prop];
+			style[prop] = value;
+			return function() {
+				style[prop] = prev;
+			};
+		}
+		function groupHandle(list) {
+			if (!list.length) return null;
+			var head = list[list.length - 1];
+			if (list.length === 1) return head;
+			head.animations = list;
+			[
+				"cancel",
+				"pause",
+				"play",
+				"finish"
+			].forEach(function(m) {
+				var own = head[m].bind(head);
+				head[m] = function() {
+					list.forEach(function(a) {
+						if (a !== head) a[m]();
+					});
+					own();
+				};
+			});
+			return head;
+		}
 		function timing(spec, opts, extraDelay) {
 			var speed = opts.speed != null ? opts.speed : CONFIG.defaults.speed || 1;
 			var base = spec.duration != null ? spec.duration : spec.base;
@@ -679,8 +712,9 @@ var IchavaMotion = (function() {
 			if (!el || !spec || !spec.keyframes || !spec.keyframes.length) return null;
 			if (reduceMotion()) return null;
 			opts = opts || {};
-			if (spec.origin && el.style) el.style.transformOrigin = spec.origin;
-			return el.animate(spec.keyframes, timing(spec, opts));
+			var restore = spec.origin && el.style ? setInline(el, "transformOrigin", spec.origin) : null;
+			var anim = el.animate(spec.keyframes, timing(spec, opts));
+			return restore ? onCancel(anim, restore) : anim;
 		}
 		function childLayers(el) {
 			var n = el.querySelectorAll("[data-layer]");
@@ -693,19 +727,20 @@ var IchavaMotion = (function() {
 			var kids = childLayers(el);
 			if (!kids || !kids.length) return playSpec(el, spec, opts);
 			var stagger = opts.stagger != null ? opts.stagger : spec.stagger != null ? spec.stagger : 90;
-			var last = null;
+			var made = [];
 			for (var i = 0; i < kids.length; i++) {
-				if (spec.origin && kids[i].style) kids[i].style.transformOrigin = spec.origin;
-				last = kids[i].animate(spec.keyframes, timing(spec, opts, i * stagger));
+				var restore = spec.origin && kids[i].style ? setInline(kids[i], "transformOrigin", spec.origin) : null;
+				var anim = kids[i].animate(spec.keyframes, timing(spec, opts, i * stagger));
+				made.push(restore ? onCancel(anim, restore) : anim);
 			}
-			return last;
+			return groupHandle(made);
 		}
 		function drawPaths(el, spec, opts) {
 			opts = opts || {};
 			var paths = el.querySelectorAll("path, line, polyline, polygon, circle, rect");
 			if (!paths.length) return playSpec(el, spec, opts);
 			var stagger = opts.stagger != null ? opts.stagger : spec.stagger != null ? spec.stagger : 120;
-			var last = null, drawn = 0;
+			var made = [], drawn = 0;
 			for (var i = 0; i < paths.length; i++) {
 				var p = paths[i], len = 0;
 				try {
@@ -714,11 +749,14 @@ var IchavaMotion = (function() {
 					len = 0;
 				}
 				if (!len) continue;
-				p.style.strokeDasharray = String(len);
-				p.style.strokeDashoffset = String(len);
-				last = p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger));
+				var undoArray = setInline(p, "strokeDasharray", String(len));
+				var undoOffset = setInline(p, "strokeDashoffset", String(len));
+				made.push(onCancel(p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)), function() {
+					undoOffset();
+					undoArray();
+				}));
 			}
-			return last;
+			return groupHandle(made);
 		}
 		function play(el, presetId, opts) {
 			var spec = PRESETS[presetId];
@@ -748,6 +786,7 @@ var IchavaMotion = (function() {
 			return null;
 		}
 		var lottieWarned = false;
+		var lottieRiskWarned = false;
 		function resolveLottiePlayer() {
 			if (CONFIG.lottiePlayer) return CONFIG.lottiePlayer;
 			if (typeof window !== "undefined" && window.lottie) return window.lottie;
@@ -755,6 +794,13 @@ var IchavaMotion = (function() {
 		}
 		function loadLottieWeb(el, json) {
 			if (!el) return null;
+			if (!CONFIG.lottieFullAcknowledgeEvalRisk) {
+				if (!lottieRiskWarned) {
+					lottieRiskWarned = true;
+					console.warn("[ichava-motion] lottie:\"full\" is disabled. The full lottie-web build evaluates expressions in the animation JSON with eval, so untrusted JSON would run as code. Use lottie:\"import\" or lottie_light for untrusted input, or, if every file is yours, opt in with IchavaMotion.config({ lottieFullAcknowledgeEvalRisk: true }).");
+				}
+				return null;
+			}
 			var lottie = resolveLottiePlayer();
 			if (!lottie) {
 				if (!lottieWarned) {

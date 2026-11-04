@@ -94,8 +94,27 @@ motion.play(el, 'spin-subtle', { speed: 1.25 });
 - `config({ lottie: 'off' })`: **default**; ignores bodymovin JSON. Core payload only.
 - `config({ lottie: 'import' })` + `<script src="dist/ichava-motion-lottie.js">`: maps **simple**
   single-layer bodymovin (transform/opacity keyframes) → our schema, played via WAAPI. No shapes/masks.
-- `config({ lottie: 'full' })`: for arbitrary bodymovin, **lazy-loads `lottie-web`** on demand (fetched
-  only when a complex file is passed; not in the core bundle).
+- `config({ lottie: 'full' })`: for arbitrary bodymovin, hands the JSON to a **lottie-web you supply**
+  (`config({ lottiePlayer })` or `window.lottie`); this library never fetches one. It does nothing until you
+  also set `lottieFullAcknowledgeEvalRisk: true`; read the warning below first.
+
+> **Warning: `'full'` can execute code from the animation file.** The full lottie-web build evaluates
+> expression fields in Lottie JSON with `eval`. Any Lottie file from a user, a third party or a URL you do
+> not control is therefore code running in your page. For untrusted input use `'import'`, or supply
+> `lottie_light`, which has no expression support. The default stays `'off'`, and `'full'` is inert until
+> you opt in:
+>
+> ```js
+> IchavaMotion.config({ lottie: 'full', lottiePlayer: lottie, lottieFullAcknowledgeEvalRisk: true });
+> ```
+
+### Controlling a running animation
+
+`play()` returns the WAAPI `Animation` (or `null`). For a group family (`reveal`, `cascade`, `draw` and the
+other per-child presets) it returns the last child's `Animation` with `cancel()`, `pause()`, `play()` and
+`finish()` applied to every child, and all of them in `animations` (typed as `GroupAnimation`).
+Cancelling puts back the inline styles the animation set (`transform-origin`, and a `draw` path's
+`stroke-dasharray` and `stroke-dashoffset`), so a cancelled preview is not left hidden or re-pivoted.
 
 ## Accessibility
 

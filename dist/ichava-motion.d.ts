@@ -115,6 +115,21 @@ export interface MotionCatalog {
 export interface GroupAnimation extends Animation {
     animations: Animation[];
 }
+/** Options for `auto()` and `autoInit()`. Every field is optional. */
+export interface AutoOptions {
+    /**
+     * Also wire `[data-ichava-motion]` elements added under the root later, through one
+     * MutationObserver; a wired element removed from the root is unwired. `destroy()`
+     * disconnects it. Off by default.
+     */
+    observe?: boolean;
+    /**
+     * A pause button the HOST renders (an element or a selector); the engine renders
+     * nothing. A click toggles `pauseAll()`/`resumeAll()` and keeps `aria-pressed` in step,
+     * which is the WCAG 2.2.2 mechanism for motion that loops. `destroy()` detaches it.
+     */
+    pauseControl?: Element | string;
+}
 export interface IchavaMotionApi {
     readonly version: string;
     /** Merge partial config over the current settings (prototype-pollution-safe). Returns `this` for chaining. */
@@ -130,7 +145,27 @@ export interface IchavaMotionApi {
         trigger?: 'loop';
     }): Animation | null;
     /** Declaratively wire every `[data-ichava-motion]` element under `root` (default: document). */
-    auto(root?: ParentNode): void;
+    auto(root?: ParentNode, options?: AutoOptions): void;
+    /** The same, on the document, with options: `auto({ observe: true })`. */
+    auto(options: AutoOptions): void;
+    /**
+     * Undo `auto()` for every wired element under `root` (default: document), and `root`
+     * itself: its listeners and visibility observer are removed and its running animation is
+     * cancelled. A later `auto()` can wire it again.
+     */
+    unwire(root?: ParentNode): void;
+    /**
+     * Tear this engine down: `unwire(document)`, `stopAll()`, and disconnect every observer,
+     * pause control and the reduced-motion listener it installed. Registered presets and
+     * config are kept, so the engine can be used again.
+     */
+    destroy(): void;
+    /** Pause every animation this engine started that is still live. Returns `this`. */
+    pauseAll(): IchavaMotionApi;
+    /** Resume every animation `pauseAll()` (or anything else) paused. A no-op under reduced motion. Returns `this`. */
+    resumeAll(): IchavaMotionApi;
+    /** Cancel every animation this engine started; they are forgotten and cannot be resumed. Returns `this`. */
+    stopAll(): IchavaMotionApi;
     /** The full generated preset registry, keyed by id. */
     presets(): Record<string, MotionSpec>;
     presetIds(): string[];
@@ -163,8 +198,9 @@ export interface IchavaMotionApi {
      * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
      * Off by default (WCAG 2.2.2): merely loading the script must not start looping
      * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
+     * Takes the same options as `auto()`, e.g. `autoInit({ pauseControl: '#pause-motion' })`.
      */
-    autoInit(): IchavaMotionApi;
+    autoInit(options?: AutoOptions): IchavaMotionApi;
 }
 /** The default instance: the module's default export and the `<script>` global. */
 declare var IchavaMotion: IchavaMotionApi;

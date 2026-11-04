@@ -147,6 +147,22 @@ export interface GroupAnimation extends Animation {
   animations: Animation[];
 }
 
+/** Options for `auto()` and `autoInit()`. Every field is optional. */
+export interface AutoOptions {
+  /**
+   * Also wire `[data-ichava-motion]` elements added under the root later, through one
+   * MutationObserver; a wired element removed from the root is unwired. `destroy()`
+   * disconnects it. Off by default.
+   */
+  observe?: boolean;
+  /**
+   * A pause button the HOST renders (an element or a selector); the engine renders
+   * nothing. A click toggles `pauseAll()`/`resumeAll()` and keeps `aria-pressed` in step,
+   * which is the WCAG 2.2.2 mechanism for motion that loops. `destroy()` detaches it.
+   */
+  pauseControl?: Element | string;
+}
+
 export interface IchavaMotionApi {
   readonly version: string;
 
@@ -166,7 +182,32 @@ export interface IchavaMotionApi {
   fromJSON(el: Element | string, def: PlaySpec, opts?: PlayOptions & { trigger?: 'loop' }): Animation | null;
 
   /** Declaratively wire every `[data-ichava-motion]` element under `root` (default: document). */
-  auto(root?: ParentNode): void;
+  auto(root?: ParentNode, options?: AutoOptions): void;
+  /** The same, on the document, with options: `auto({ observe: true })`. */
+  auto(options: AutoOptions): void;
+
+  /**
+   * Undo `auto()` for every wired element under `root` (default: document), and `root`
+   * itself: its listeners and visibility observer are removed and its running animation is
+   * cancelled. A later `auto()` can wire it again.
+   */
+  unwire(root?: ParentNode): void;
+
+  /**
+   * Tear this engine down: `unwire(document)`, `stopAll()`, and disconnect every observer,
+   * pause control and the reduced-motion listener it installed. Registered presets and
+   * config are kept, so the engine can be used again.
+   */
+  destroy(): void;
+
+  /** Pause every animation this engine started that is still live. Returns `this`. */
+  pauseAll(): IchavaMotionApi;
+
+  /** Resume every animation `pauseAll()` (or anything else) paused. A no-op under reduced motion. Returns `this`. */
+  resumeAll(): IchavaMotionApi;
+
+  /** Cancel every animation this engine started; they are forgotten and cannot be resumed. Returns `this`. */
+  stopAll(): IchavaMotionApi;
 
   /** The full generated preset registry, keyed by id. */
   presets(): Record<string, MotionSpec>;
@@ -208,8 +249,9 @@ export interface IchavaMotionApi {
    * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
    * Off by default (WCAG 2.2.2): merely loading the script must not start looping
    * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
+   * Takes the same options as `auto()`, e.g. `autoInit({ pauseControl: '#pause-motion' })`.
    */
-  autoInit(): IchavaMotionApi;
+  autoInit(options?: AutoOptions): IchavaMotionApi;
 }
 
 /* ─── internal types ─────────────────────────────────────────────────────── */
@@ -394,6 +436,54 @@ function createMotion(): IchavaMotionApi {
     } catch (e) { return true; }
   }
 
+  /*
+   * ─── live handles (M3) ──────────────────────────────────────────────────────
+   * Every handle the engine returns is kept here until it finishes or is cancelled, so
+   * pauseAll/resumeAll/stopAll can reach animations whose handles the caller dropped --
+   * the declarative path never hands them out at all. WCAG 2.2.2 needs that reach.
+   */
+  var LIVE = new Set<Animation>();
+  // Undo functions for what this engine attached outside an element: the reduced-motion
+  // listener, pause controls, mutation observers. destroy() runs and clears them.
+  var TEARDOWN: Array<() => void> = [];
+  var reduceBound = false;
+
+  function track(anim: Animation | null): Animation | null {
+    if (!anim) return anim;
+    LIVE.add(anim);
+    if (typeof anim.addEventListener === 'function') {
+      var drop = function () { LIVE.delete(anim!); };
+      anim.addEventListener('finish', drop);
+      anim.addEventListener('cancel', drop);
+    }
+    bindReducedMotion();
+    return anim;
+  }
+
+  /*
+   * A user who turns on "reduce motion" while the page is open is honoured then, not on
+   * the next play. Bound lazily on the first animation, so importing the module touches no
+   * DOM, and once per engine.
+   */
+  function bindReducedMotion(): void {
+    if (reduceBound || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    var mq: MediaQueryList;
+    try { mq = window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (e) { return; }
+    if (!mq || typeof mq.addEventListener !== 'function') return;
+    var onChange = function () { if (reduceMotion()) stopAll(); };
+    mq.addEventListener('change', onChange);
+    reduceBound = true;
+    TEARDOWN.push(function () { mq.removeEventListener('change', onChange); reduceBound = false; });
+  }
+
+  function pauseAll(): void { LIVE.forEach(function (a) { a.pause(); }); }
+  function resumeAll(): void { if (reduceMotion()) return; LIVE.forEach(function (a) { a.play(); }); }
+  function stopAll(): void {
+    var all = Array.from(LIVE);
+    LIVE.clear();
+    all.forEach(function (a) { a.cancel(); });
+  }
+
   /* ─── player ─────────────────────────────────────────────────────────────── */
   function toEl(target: Element | string | null): Element | null { return typeof target === 'string' ? document.querySelector(target) : target; }
 
@@ -454,7 +544,7 @@ function createMotion(): IchavaMotionApi {
     opts = opts || {};
     var restore = spec.origin && (el as HTMLElement).style ? setInline(el, 'transformOrigin', spec.origin) : null;
     var anim = el.animate(spec.keyframes, timing(spec, opts));
-    return restore ? onCancel(anim, restore) : anim;
+    return track(restore ? onCancel(anim, restore) : anim);
   }
 
   // The SVG's animatable layers (illustration groups / paths), for child-targeting.
@@ -477,7 +567,7 @@ function createMotion(): IchavaMotionApi {
       var anim = kids[i]!.animate(spec.keyframes, timing(spec, opts, i * stagger));
       made.push(restore ? onCancel(anim, restore) : anim);
     }
-    return groupHandle(made);
+    return track(groupHandle(made));
   }
 
   // Real "Draw": measure each child path and animate its stroke-dashoffset to 0.
@@ -498,7 +588,7 @@ function createMotion(): IchavaMotionApi {
         function () { undoOffset(); undoArray(); }
       ));
     }
-    return groupHandle(made);
+    return track(groupHandle(made));
   }
 
   function play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null {
@@ -601,41 +691,143 @@ function createMotion(): IchavaMotionApi {
   }
 
   /* ─── declarative auto-init (data-*) ─────────────────────────────────────── */
+  /*
+   * One parser for every numeric data-motion-* attribute (M6). The bare parseFloat this
+   * replaces let NaN and out-of-range values straight into WAAPI timing, where animate()
+   * throws a TypeError for them, and the whole wire() call died with it. A bad value now
+   * takes the default (undefined: the option is simply not set) and names the attribute
+   * once, so the markup can be fixed.
+   *
+   * The ranges are exactly what WAAPI and timing() accept, no narrower: a value that
+   * played before still plays. A negative delay is valid WAAPI (it starts part-way
+   * through), and timing() clamps any speed, so only NaN is refused for those.
+   */
+  function num(attr: string, v: string, fallback: number | undefined, min: number, max: number): number | undefined {
+    var n = parseFloat(v);
+    if (n === n && n >= min && n <= max) return n; // n === n is false only for NaN
+    // eslint-disable-next-line no-console
+    console.warn('[ichava-motion] ' + attr + '="' + v + '" is not a number in [' + min + ', ' + max + ']; using the default.');
+    return fallback;
+  }
+  var F = Number.MAX_VALUE; // finite: WAAPI's delay must be
   function readOpts(el: HTMLElement): PlayOptions {
     var d = el.dataset;
     var o: PlayOptions = {};
-    if (d.motionSpeed) o.speed = parseFloat(d.motionSpeed);
+    var x: number | undefined;
+    if (d.motionSpeed && (x = num('data-motion-speed', d.motionSpeed, undefined, -Infinity, Infinity)) !== undefined) o.speed = x;
+    if (d.motionDuration && (x = num('data-motion-duration', d.motionDuration, undefined, 0, Infinity)) !== undefined) o.duration = x;
     if (d.motionEasing) o.easing = d.motionEasing;
-    if (d.motionDelay) o.delay = parseFloat(d.motionDelay);
+    if (d.motionDelay && (x = num('data-motion-delay', d.motionDelay, undefined, -F, F)) !== undefined) o.delay = x;
     if (d.motionDirection) o.direction = d.motionDirection as Direction;
-    if (d.motionIterations) o.iterations = d.motionIterations === 'infinite' ? Infinity : parseFloat(d.motionIterations);
-    if (d.motionStagger) o.stagger = parseFloat(d.motionStagger);
+    if (d.motionIterations) {
+      if (d.motionIterations === 'infinite') o.iterations = Infinity;
+      else if ((x = num('data-motion-iterations', d.motionIterations, undefined, 0, Infinity)) !== undefined) o.iterations = x;
+    }
+    if (d.motionStagger && (x = num('data-motion-stagger', d.motionStagger, undefined, -F, F)) !== undefined) o.stagger = x;
     return o;
   }
-  var wired = new WeakSet<Element>();
+
+  /*
+   * Wired element -> the function that unwires it (M4). A WeakMap, not the Map the design
+   * sketched: a Map holds every element ever wired, so a single-page app that removes nodes
+   * without calling unwire() would leak them, which the WeakSet this replaces never did.
+   * unwire(root) finds its elements by querying root, so nothing needs to iterate this.
+   */
+  var WIRED = new WeakMap<Element, () => void>();
   function wire(el: Element): void {
-    if (wired.has(el)) return; wired.add(el);
+    if (WIRED.has(el)) return;
+    var offs: Array<() => void> = [];
     var id = el.getAttribute('data-ichava-motion') as string;
     var trigger = el.getAttribute('data-motion-trigger') || CONFIG.defaults.trigger || 'load';
     var opts = readOpts(el as HTMLElement);
     var current: Animation | null = null;
     function start(o?: PlayOptions) { if (current) current.cancel(); current = play(el, id, o || opts); return current; }
+    function on(type: string, fn: () => void) {
+      el.addEventListener(type, fn);
+      offs.push(function () { el.removeEventListener(type, fn); });
+    }
+    offs.push(function () { if (current) current.cancel(); current = null; });
+    WIRED.set(el, function () { offs.forEach(function (f) { f(); }); });
     if (trigger === 'load') { start(); }
     else if (trigger === 'loop') { start({ iterations: Infinity }); }
     else if (trigger === 'hover') {
-      el.addEventListener('mouseenter', function () { start(); });
-      el.addEventListener('mouseleave', function () { if (current) current.cancel(); });
+      on('mouseenter', function () { start(); });
+      on('mouseleave', function () { if (current) current.cancel(); });
     } else if (trigger === 'click') {
-      el.addEventListener('click', function () { if (current && current.playState === 'running') current.cancel(); else start(); });
+      on('click', function () { if (current && current.playState === 'running') current.cancel(); else start(); });
     } else if (trigger === 'visible') {
       if ('IntersectionObserver' in window) {
         var io = new IntersectionObserver(function (entries) { entries.forEach(function (e) { if (e.isIntersecting) { start({ iterations: PRESETS[id] && PRESETS[id]!.once ? 1 : opts.iterations }); io.unobserve(el); } }); });
         io.observe(el);
+        offs.push(function () { io.disconnect(); });
       } else start();
     }
   }
-  function auto(root?: ParentNode): void {
-    (root || document).querySelectorAll('[data-ichava-motion]').forEach(wire);
+
+  function unwireOne(el: Element): void {
+    var off = WIRED.get(el);
+    if (!off) return;
+    WIRED.delete(el);
+    off();
+  }
+  function unwire(root?: ParentNode): void {
+    var r = root || document;
+    unwireOne(r as Element);
+    r.querySelectorAll('[data-ichava-motion]').forEach(unwireOne);
+  }
+
+  // Wire nodes added under root later; unwire wired nodes taken out of it (M4).
+  function observe(root: ParentNode): void {
+    if (typeof MutationObserver === 'undefined') return;
+    var mo = new MutationObserver(function (records) {
+      records.forEach(function (rec) {
+        rec.removedNodes.forEach(function (n) {
+          // A moved node is reported removed and then added; only a detached one is let go.
+          if (n.nodeType === 1 && !n.isConnected) unwire(n as Element);
+        });
+        rec.addedNodes.forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          if ((n as Element).hasAttribute('data-ichava-motion')) wire(n as Element);
+          (n as Element).querySelectorAll('[data-ichava-motion]').forEach(wire);
+        });
+      });
+    });
+    mo.observe(root as Node, { childList: true, subtree: true });
+    TEARDOWN.push(function () { mo.disconnect(); });
+  }
+
+  // A pause button the host renders; the engine only listens to it (M3, WCAG 2.2.2).
+  function bindPauseControl(target: Element | string): void {
+    var btn = toEl(target);
+    if (!btn) return;
+    var paused = false;
+    btn.setAttribute('aria-pressed', 'false');
+    var onClick = function () {
+      paused = !paused;
+      if (paused) pauseAll(); else resumeAll();
+      btn!.setAttribute('aria-pressed', String(paused));
+    };
+    btn.addEventListener('click', onClick);
+    TEARDOWN.push(function () { btn!.removeEventListener('click', onClick); });
+  }
+
+  function auto(rootOrOptions?: ParentNode | AutoOptions, options?: AutoOptions): void {
+    var root: ParentNode, o: AutoOptions;
+    if (rootOrOptions && typeof (rootOrOptions as ParentNode).querySelectorAll === 'function') {
+      root = rootOrOptions as ParentNode; o = options || {};
+    } else {
+      root = document; o = (rootOrOptions as AutoOptions) || options || {};
+    }
+    root.querySelectorAll('[data-ichava-motion]').forEach(wire);
+    if (o.observe) observe(root);
+    if (o.pauseControl) bindPauseControl(o.pauseControl);
+  }
+
+  function destroy(): void {
+    if (typeof document !== 'undefined') unwire(document);
+    stopAll();
+    var undo = TEARDOWN; TEARDOWN = [];
+    undo.forEach(function (f) { f(); });
   }
 
   /* ─── public API ─────────────────────────────────────────────────────────── */
@@ -649,6 +841,11 @@ function createMotion(): IchavaMotionApi {
     // detail dialog's Motion tab exports exactly this shape. `{ trigger:'loop' }` loops.
     fromJSON: function (el, def, opts) { opts = opts || {}; if (opts.trigger === 'loop') opts.iterations = Infinity; return playSpec(el, def, opts); },
     auto: auto,
+    unwire: unwire,
+    destroy: destroy,
+    pauseAll: function () { pauseAll(); return this; },
+    resumeAll: function () { resumeAll(); return this; },
+    stopAll: function () { stopAll(); return this; },
     presets: function () { return PRESETS; },
     presetIds: function () { return Object.keys(PRESETS); },
     easings: function () { return assign({}, EASINGS); },
@@ -678,12 +875,13 @@ function createMotion(): IchavaMotionApi {
    * `prefersReduced()` is still honoured inside `auto()`, so even an explicit opt-in does
    * nothing for a user who asked for less motion.
    */
-  IchavaMotion.autoInit = function autoInit(): IchavaMotionApi {
+  IchavaMotion.autoInit = function autoInit(options?: AutoOptions): IchavaMotionApi {
     if (typeof document === 'undefined') return IchavaMotion;
+    var o = options || {};
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function () { auto(); });
+      document.addEventListener('DOMContentLoaded', function () { auto(o); });
     } else {
-      auto();
+      auto(o);
     }
     return IchavaMotion;
   };

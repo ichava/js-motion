@@ -60,7 +60,7 @@
   },
   "scripts": {
     "gen": "node scripts/gen-presets.mjs",
-    "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build && tsc -p tsconfig.build.json",
+    "build": "node scripts/gen-presets.mjs && sass src/ichava-motion.scss dist/ichava-motion.css --no-source-map --style=expanded && vite build && tsc -p tsconfig.build.json && vite build -c vite.min.config.mjs && node scripts/integrity.mjs",
     "dev": "vite --open /demo/",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json",

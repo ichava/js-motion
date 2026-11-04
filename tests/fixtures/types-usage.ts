@@ -12,6 +12,7 @@ import IchavaMotion, {
   type VariantSpec,
   type IchavaMotionApi,
   type MotionCatalog,
+  type AutoOptions,
 } from '@ichava/js-motion';
 
 const el = document.querySelector('.icon')!;
@@ -49,3 +50,13 @@ own.play(el, 'spin-subtle', { speed: 1.25 });
 
 const catalog: MotionCatalog = IchavaMotion.catalog();
 export const familyIds: string[] = catalog.families.map((f) => f.id);
+
+// v0.1.0 deferred APIs (M3, M4): the pause/stop set chains, the auto() options and teardown.
+const autoOpts: AutoOptions = { observe: true, pauseControl: '#pause-motion' };
+IchavaMotion.auto(autoOpts);
+IchavaMotion.auto(document.body, { observe: true });
+IchavaMotion.autoInit({ pauseControl: document.body });
+const chained: IchavaMotionApi = IchavaMotion.pauseAll().resumeAll().stopAll();
+chained.unwire(document.body);
+chained.unwire();
+IchavaMotion.create().destroy();

@@ -23,7 +23,14 @@ Version 0.1.0. Runs in any modern browser; the build tooling needs Node 24 or ne
 ```
 
 The tag ships the built `dist/`, so nothing builds on install. Without a bundler, copy the two built
-files and load them with a `<link>` and a `<script>`; see [docs/installation.md](docs/installation.md).
+files and load them with a `<link>` and a `<script>`; `dist/ichava-motion.min.js` is the minified build,
+and `dist/integrity.json` carries the `sha384` for an `integrity` attribute when you self-host:
+
+```html
+<script src="/vendor/ichava-motion.min.js" integrity="sha384-…from dist/integrity.json…" crossorigin="anonymous"></script>
+```
+
+See [docs/installation.md](docs/installation.md#self-hosting-with-subresource-integrity).
 
 ## Quick start guide and usage
 
@@ -57,7 +64,10 @@ IchavaMotion.play(el, 'heartbeat', { speed: 1, easing: 'ease-in-out', iterations
 ```
 
 `play()` returns the animation, so a preview can `cancel()` it; a group preset returns one handle that
-cancels, pauses and finishes every child. Lottie `'full'` mode runs the animation file's expressions with
+cancels, pauses and finishes every child. `pauseAll()`, `resumeAll()` and `stopAll()` reach every animation
+the engine started, and `autoInit({ pauseControl: '#pause-motion' })` hands them to a button you render
+(WCAG 2.2.2). `auto(root, { observe: true })` also wires elements added later; `unwire(root)` and
+`destroy()` undo it. Lottie `'full'` mode runs the animation file's expressions with
 `eval` and stays off until you opt in; see [docs/lottie.md](docs/lottie.md).
 
 The full walkthrough is in [docs/getting-started.md](docs/getting-started.md), the tour of every tier is

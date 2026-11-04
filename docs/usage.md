@@ -25,8 +25,30 @@ Tune with CSS vars: `--ichm-duration`, `--ichm-easing`, `--ichm-iterations` (glo
      data-motion-easing="spring"
      data-motion-delay="200"
      data-motion-direction="reverse"
+     data-motion-duration="900"
      data-motion-iterations="3">…</svg>
 ```
+
+Every number (`speed`, `duration`, `delay`, `iterations`, `stagger`) is checked before it reaches the
+Web Animations API. A value it would reject, such as `data-motion-duration="abc"` or `"-5"`, takes the
+default and logs one `console.warn` naming the attribute, so one typo no longer stops the element from
+wiring. Anything the API accepts still plays, a negative `delay` included.
+
+`IchavaMotion.auto(root)` wires one subtree instead of the whole document. Pass `{ observe: true }` to wire
+elements added under it later as well, which a list that re-renders needs:
+
+```js
+const motion = IchavaMotion.create();
+motion.auto(heroEl, { observe: true });   // also wires tiles added after this call
+// later, when heroEl goes away:
+motion.unwire(heroEl);                    // or motion.destroy() to tear the whole engine down
+```
+
+`unwire(root)` removes the listeners from every wired element under `root` and cancels what they were
+playing; a later `auto()` can wire them again. `destroy()` unwires the document, stops every animation,
+and disconnects the observers, pause controls and reduced-motion listener the engine installed. Use a
+`create()` instance when you destroy, so another embed on the page sharing the default engine keeps
+its animations.
 
 **3 · Imperative**
 
@@ -116,10 +138,34 @@ other per-child presets) it returns the last child's `Animation` with `cancel()`
 Cancelling puts back the inline styles the animation set (`transform-origin`, and a `draw` path's
 `stroke-dasharray` and `stroke-dashoffset`), so a cancelled preview is not left hidden or re-pivoted.
 
+### Pausing and stopping everything
+
+The engine keeps every animation it started until it finishes or is cancelled, including the ones the
+declarative path started and never handed out:
+
+```js
+IchavaMotion.pauseAll();   // every live animation, paused where it is
+IchavaMotion.resumeAll();  // carries on from there; a no-op under reduced motion
+IchavaMotion.stopAll();    // cancels them; they cannot be resumed
+```
+
+Each returns the engine, so they chain. They act on one engine: an instance from `create()` has its own set.
+
 ## Accessibility
 
-Honors `prefers-reduced-motion` (and a host `[data-reduce-motion]`) by not starting animations. Override
-with `config({ reduceMotion: 'off' })`.
+Honors `prefers-reduced-motion` (and a host `[data-reduce-motion]`) by not starting animations, and
+reacts when the preference changes while the page is open: turning it on stops every running animation.
+Override with `config({ reduceMotion: 'off' })`.
+
+WCAG 2.2.2 asks that motion which loops for more than five seconds can be paused. The engine renders no
+button; give it yours, and a click toggles `pauseAll()`/`resumeAll()` and keeps `aria-pressed` in step:
+
+```html
+<button type="button" id="pause-motion">Pause animations</button>
+<script>IchavaMotion.autoInit({ pauseControl: '#pause-motion' })</script>
+```
+
+`auto(root, { pauseControl })` takes the same option, and `destroy()` detaches it.
 
 ---
 

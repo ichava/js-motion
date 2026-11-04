@@ -656,6 +656,59 @@ var IchavaMotion = (function() {
 				return true;
 			}
 		}
+		var LIVE = /* @__PURE__ */ new Set();
+		var TEARDOWN = [];
+		var reduceBound = false;
+		function track(anim) {
+			if (!anim) return anim;
+			LIVE.add(anim);
+			if (typeof anim.addEventListener === "function") {
+				var drop = function() {
+					LIVE.delete(anim);
+				};
+				anim.addEventListener("finish", drop);
+				anim.addEventListener("cancel", drop);
+			}
+			bindReducedMotion();
+			return anim;
+		}
+		function bindReducedMotion() {
+			if (reduceBound || typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+			var mq;
+			try {
+				mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+			} catch (e) {
+				return;
+			}
+			if (!mq || typeof mq.addEventListener !== "function") return;
+			var onChange = function() {
+				if (reduceMotion()) stopAll();
+			};
+			mq.addEventListener("change", onChange);
+			reduceBound = true;
+			TEARDOWN.push(function() {
+				mq.removeEventListener("change", onChange);
+				reduceBound = false;
+			});
+		}
+		function pauseAll() {
+			LIVE.forEach(function(a) {
+				a.pause();
+			});
+		}
+		function resumeAll() {
+			if (reduceMotion()) return;
+			LIVE.forEach(function(a) {
+				a.play();
+			});
+		}
+		function stopAll() {
+			var all = Array.from(LIVE);
+			LIVE.clear();
+			all.forEach(function(a) {
+				a.cancel();
+			});
+		}
 		function toEl(target) {
 			return typeof target === "string" ? document.querySelector(target) : target;
 		}
@@ -714,7 +767,7 @@ var IchavaMotion = (function() {
 			opts = opts || {};
 			var restore = spec.origin && el.style ? setInline(el, "transformOrigin", spec.origin) : null;
 			var anim = el.animate(spec.keyframes, timing(spec, opts));
-			return restore ? onCancel(anim, restore) : anim;
+			return track(restore ? onCancel(anim, restore) : anim);
 		}
 		function childLayers(el) {
 			var n = el.querySelectorAll("[data-layer]");
@@ -733,7 +786,7 @@ var IchavaMotion = (function() {
 				var anim = kids[i].animate(spec.keyframes, timing(spec, opts, i * stagger));
 				made.push(restore ? onCancel(anim, restore) : anim);
 			}
-			return groupHandle(made);
+			return track(groupHandle(made));
 		}
 		function drawPaths(el, spec, opts) {
 			opts = opts || {};
@@ -756,7 +809,7 @@ var IchavaMotion = (function() {
 					undoArray();
 				}));
 			}
-			return groupHandle(made);
+			return track(groupHandle(made));
 		}
 		function play(el, presetId, opts) {
 			var spec = PRESETS[presetId];
@@ -818,21 +871,33 @@ var IchavaMotion = (function() {
 			});
 			return null;
 		}
+		function num(attr, v, fallback, min, max) {
+			var n = parseFloat(v);
+			if (n === n && n >= min && n <= max) return n;
+			console.warn("[ichava-motion] " + attr + "=\"" + v + "\" is not a number in [" + min + ", " + max + "]; using the default.");
+			return fallback;
+		}
+		var F = Number.MAX_VALUE;
 		function readOpts(el) {
 			var d = el.dataset;
 			var o = {};
-			if (d.motionSpeed) o.speed = parseFloat(d.motionSpeed);
+			var x;
+			if (d.motionSpeed && (x = num("data-motion-speed", d.motionSpeed, void 0, -Infinity, Infinity)) !== void 0) o.speed = x;
+			if (d.motionDuration && (x = num("data-motion-duration", d.motionDuration, void 0, 0, Infinity)) !== void 0) o.duration = x;
 			if (d.motionEasing) o.easing = d.motionEasing;
-			if (d.motionDelay) o.delay = parseFloat(d.motionDelay);
+			if (d.motionDelay && (x = num("data-motion-delay", d.motionDelay, void 0, -F, F)) !== void 0) o.delay = x;
 			if (d.motionDirection) o.direction = d.motionDirection;
-			if (d.motionIterations) o.iterations = d.motionIterations === "infinite" ? Infinity : parseFloat(d.motionIterations);
-			if (d.motionStagger) o.stagger = parseFloat(d.motionStagger);
+			if (d.motionIterations) {
+				if (d.motionIterations === "infinite") o.iterations = Infinity;
+				else if ((x = num("data-motion-iterations", d.motionIterations, void 0, 0, Infinity)) !== void 0) o.iterations = x;
+			}
+			if (d.motionStagger && (x = num("data-motion-stagger", d.motionStagger, void 0, -F, F)) !== void 0) o.stagger = x;
 			return o;
 		}
-		var wired = /* @__PURE__ */ new WeakSet();
+		var WIRED = /* @__PURE__ */ new WeakMap();
 		function wire(el) {
-			if (wired.has(el)) return;
-			wired.add(el);
+			if (WIRED.has(el)) return;
+			var offs = [];
 			var id = el.getAttribute("data-ichava-motion");
 			var trigger = el.getAttribute("data-motion-trigger") || CONFIG.defaults.trigger || "load";
 			var opts = readOpts(el);
@@ -842,16 +907,31 @@ var IchavaMotion = (function() {
 				current = play(el, id, o || opts);
 				return current;
 			}
+			function on(type, fn) {
+				el.addEventListener(type, fn);
+				offs.push(function() {
+					el.removeEventListener(type, fn);
+				});
+			}
+			offs.push(function() {
+				if (current) current.cancel();
+				current = null;
+			});
+			WIRED.set(el, function() {
+				offs.forEach(function(f) {
+					f();
+				});
+			});
 			if (trigger === "load") start();
 			else if (trigger === "loop") start({ iterations: Infinity });
 			else if (trigger === "hover") {
-				el.addEventListener("mouseenter", function() {
+				on("mouseenter", function() {
 					start();
 				});
-				el.addEventListener("mouseleave", function() {
+				on("mouseleave", function() {
 					if (current) current.cancel();
 				});
-			} else if (trigger === "click") el.addEventListener("click", function() {
+			} else if (trigger === "click") on("click", function() {
 				if (current && current.playState === "running") current.cancel();
 				else start();
 			});
@@ -866,11 +946,82 @@ var IchavaMotion = (function() {
 						});
 					});
 					io.observe(el);
+					offs.push(function() {
+						io.disconnect();
+					});
 				} else start();
 			}
 		}
-		function auto(root) {
-			(root || document).querySelectorAll("[data-ichava-motion]").forEach(wire);
+		function unwireOne(el) {
+			var off = WIRED.get(el);
+			if (!off) return;
+			WIRED.delete(el);
+			off();
+		}
+		function unwire(root) {
+			var r = root || document;
+			unwireOne(r);
+			r.querySelectorAll("[data-ichava-motion]").forEach(unwireOne);
+		}
+		function observe(root) {
+			if (typeof MutationObserver === "undefined") return;
+			var mo = new MutationObserver(function(records) {
+				records.forEach(function(rec) {
+					rec.removedNodes.forEach(function(n) {
+						if (n.nodeType === 1 && !n.isConnected) unwire(n);
+					});
+					rec.addedNodes.forEach(function(n) {
+						if (n.nodeType !== 1) return;
+						if (n.hasAttribute("data-ichava-motion")) wire(n);
+						n.querySelectorAll("[data-ichava-motion]").forEach(wire);
+					});
+				});
+			});
+			mo.observe(root, {
+				childList: true,
+				subtree: true
+			});
+			TEARDOWN.push(function() {
+				mo.disconnect();
+			});
+		}
+		function bindPauseControl(target) {
+			var btn = toEl(target);
+			if (!btn) return;
+			var paused = false;
+			btn.setAttribute("aria-pressed", "false");
+			var onClick = function() {
+				paused = !paused;
+				if (paused) pauseAll();
+				else resumeAll();
+				btn.setAttribute("aria-pressed", String(paused));
+			};
+			btn.addEventListener("click", onClick);
+			TEARDOWN.push(function() {
+				btn.removeEventListener("click", onClick);
+			});
+		}
+		function auto(rootOrOptions, options) {
+			var root, o;
+			if (rootOrOptions && typeof rootOrOptions.querySelectorAll === "function") {
+				root = rootOrOptions;
+				o = options || {};
+			} else {
+				root = document;
+				o = rootOrOptions || options || {};
+			}
+			root.querySelectorAll("[data-ichava-motion]").forEach(wire);
+			if (o.observe) observe(root);
+			if (o.pauseControl) bindPauseControl(o.pauseControl);
+		}
+		function destroy() {
+			if (typeof document !== "undefined") unwire(document);
+			stopAll();
+			var undo = TEARDOWN;
+			TEARDOWN = [];
+			undo.forEach(function(f) {
+				f();
+			});
 		}
 		var IchavaMotion = {
 			version: VERSION,
@@ -887,6 +1038,20 @@ var IchavaMotion = (function() {
 				return playSpec(el, def, opts);
 			},
 			auto,
+			unwire,
+			destroy,
+			pauseAll: function() {
+				pauseAll();
+				return this;
+			},
+			resumeAll: function() {
+				resumeAll();
+				return this;
+			},
+			stopAll: function() {
+				stopAll();
+				return this;
+			},
 			presets: function() {
 				return PRESETS;
 			},
@@ -934,12 +1099,13 @@ var IchavaMotion = (function() {
 				};
 			}
 		};
-		IchavaMotion.autoInit = function autoInit() {
+		IchavaMotion.autoInit = function autoInit(options) {
 			if (typeof document === "undefined") return IchavaMotion;
+			var o = options || {};
 			if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function() {
-				auto();
+				auto(o);
 			});
-			else auto();
+			else auto(o);
 			return IchavaMotion;
 		};
 		return IchavaMotion;

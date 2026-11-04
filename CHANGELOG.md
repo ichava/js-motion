@@ -13,6 +13,11 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ### Fixed
 
+- **A bad `data-motion-*` number no longer stops an element from wiring** (M6). `speed`, `delay`,
+  `iterations` and `stagger` went through a bare `parseFloat`, so `"abc"` became `NaN`, and `NaN` or a
+  negative iteration count reached `animate()`, which throws. One parser now checks each value against
+  what the Web Animations API accepts; a rejected value takes the default and logs one `console.warn`
+  naming the attribute. Every value that played before still plays, a negative `delay` included.
 - **A cancelled `draw` animation restores its strokes** (M1). `stroke-dasharray` and `stroke-dashoffset` were
   left inline, so a cancelled preview stayed hidden.
 - **`transform-origin` is put back when an animation is cancelled** (M5, old M11). It was written inline for
@@ -25,6 +30,22 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ### Added
 
+- **`pauseAll()`, `resumeAll()` and `stopAll()`** (M3, WCAG 2.2.2). The engine keeps every animation it
+  started until it finishes or is cancelled, so these reach animations the declarative path never handed
+  out. Each returns the engine. A change to `prefers-reduced-motion` while the page is open now stops
+  every running animation.
+- **`AutoOptions.pauseControl`** for `auto()` and `autoInit()`: a button the host renders (the engine
+  renders nothing). A click toggles `pauseAll()`/`resumeAll()` and keeps `aria-pressed` in step.
+- **`unwire(root)`, `destroy()` and `auto({ observe: true })`** (M4). `unwire()` removes the listeners
+  from every wired element under `root` and cancels what they were playing, and the element can be wired
+  again. `observe` installs one `MutationObserver` that wires elements added later and unwires detached
+  ones. `destroy()` unwires the document, stops everything and disconnects what the engine installed.
+  `auto(root)` keeps its signature and still returns nothing; `data-motion-duration` is now read too.
+- **`dist/ichava-motion.min.js` and `dist/integrity.json`** (M12). The minified IIFE is 17,601 B
+  (5,191 B gzip) against 29,068 B unminified; before this change the only `<script>` build was the
+  unminified 24,621 B (5,551 B gzip). `integrity.json` holds the `sha384` of every `dist/` file for
+  Subresource Integrity. `tests/size-budget.test.mjs` fails above the minified size plus 10 % and on any
+  stale hash.
 - **`GroupAnimation`**: `play()` of a group family (`reveal`, `cascade`, `draw`, any per-child preset)
   returns one handle whose `cancel()`, `pause()`, `play()` and `finish()` reach every child, with the set in
   `animations` (M2). The return is still the last child's `Animation`, so existing callers are unaffected;

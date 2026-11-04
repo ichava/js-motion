@@ -52,6 +52,13 @@ export interface MotionConfig {
     lottie?: 'off' | 'import' | 'full';
     /** a lottie-web instance you provide; this library never fetches one itself */
     lottiePlayer?: unknown;
+    /**
+     * Required, as `true`, for `lottie: 'full'` to do anything. The full lottie-web build
+     * evaluates expression fields in the animation JSON with `eval`, so `'full'` on JSON from
+     * an untrusted source is code execution in your page. Set this only when every Lottie
+     * file you play is yours, or your player is lottie_light. Defaults to false.
+     */
+    lottieFullAcknowledgeEvalRisk?: boolean;
     /** 'respect' (default): honour prefers-reduced-motion and [data-reduce-motion]. 'off': ignore it. */
     reduceMotion?: 'respect' | 'off';
 }
@@ -98,6 +105,15 @@ export interface PlaySpec {
 export interface MotionCatalog {
     families: FamilySpec[];
     variants: VariantSpec[];
+}
+/**
+ * What `play()` returns for a group animation (a `perChild` or `draw` family): the last
+ * child's `Animation`, with `cancel`, `pause`, `play` and `finish` fanned out to every child
+ * and the full set in `animations`. Cast to this to read `animations`; it is still an
+ * `Animation`, so existing code that only cancels or awaits it keeps working.
+ */
+export interface GroupAnimation extends Animation {
+    animations: Animation[];
 }
 export interface IchavaMotionApi {
     readonly version: string;

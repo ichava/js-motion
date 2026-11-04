@@ -77,6 +77,13 @@ export interface MotionConfig {
   lottie?: 'off' | 'import' | 'full';
   /** a lottie-web instance you provide; this library never fetches one itself */
   lottiePlayer?: unknown;
+  /**
+   * Required, as `true`, for `lottie: 'full'` to do anything. The full lottie-web build
+   * evaluates expression fields in the animation JSON with `eval`, so `'full'` on JSON from
+   * an untrusted source is code execution in your page. Set this only when every Lottie
+   * file you play is yours, or your player is lottie_light. Defaults to false.
+   */
+  lottieFullAcknowledgeEvalRisk?: boolean;
   /** 'respect' (default): honour prefers-reduced-motion and [data-reduce-motion]. 'off': ignore it. */
   reduceMotion?: 'respect' | 'off';
 }
@@ -128,6 +135,16 @@ export interface PlaySpec {
 export interface MotionCatalog {
   families: FamilySpec[];
   variants: VariantSpec[];
+}
+
+/**
+ * What `play()` returns for a group animation (a `perChild` or `draw` family): the last
+ * child's `Animation`, with `cancel`, `pause`, `play` and `finish` fanned out to every child
+ * and the full set in `animations`. Cast to this to read `animations`; it is still an
+ * `Animation`, so existing code that only cancels or awaits it keeps working.
+ */
+export interface GroupAnimation extends Animation {
+  animations: Animation[];
 }
 
 export interface IchavaMotionApi {
@@ -207,6 +224,7 @@ interface Config {
   defaults: MotionConfigDefaults;
   lottie: NonNullable<MotionConfig['lottie']>;
   lottiePlayer: unknown;
+  lottieFullAcknowledgeEvalRisk: boolean;
   reduceMotion: NonNullable<MotionConfig['reduceMotion']>;
 }
 
@@ -324,6 +342,7 @@ function createMotion(): IchavaMotionApi {
     defaults: { duration: null, easing: 'ease-in-out', delay: 0, iterations: null, direction: null, speed: 1, trigger: 'load' },
     lottie: 'off',        // 'off' | 'import' | 'full'
     lottiePlayer: null,   // a lottie-web instance you supply; never fetched for you
+    lottieFullAcknowledgeEvalRisk: false, // 'full' stays inert until this is true (S11)
     reduceMotion: 'respect' // 'respect' | 'off'
   };
   /*
@@ -378,6 +397,39 @@ function createMotion(): IchavaMotionApi {
   /* ─── player ─────────────────────────────────────────────────────────────── */
   function toEl(target: Element | string | null): Element | null { return typeof target === 'string' ? document.querySelector(target) : target; }
 
+  /*
+   * Run `undo` when the animation is cancelled, so inline styles written for it do not
+   * outlive it (M1, M5). Fakes and old engines without addEventListener are tolerated.
+   */
+  function onCancel(anim: Animation, undo: () => void): Animation {
+    if (anim && typeof anim.addEventListener === 'function') anim.addEventListener('cancel', undo);
+    return anim;
+  }
+
+  // Set an inline style property now; return the function that puts the author's value back.
+  function setInline(node: Element, prop: 'transformOrigin' | 'strokeDasharray' | 'strokeDashoffset', value: string): () => void {
+    var style = (node as HTMLElement).style, prev = style[prop];
+    style[prop] = value;
+    return function () { style[prop] = prev; };
+  }
+
+  /*
+   * One handle for a group. The last child's Animation is returned (the shape callers
+   * already had), with cancel/pause/play/finish fanned out to every child and the set
+   * exposed as `animations`. A single child is returned untouched.
+   */
+  function groupHandle(list: Animation[]): Animation | null {
+    if (!list.length) return null;
+    var head = list[list.length - 1] as GroupAnimation;
+    if (list.length === 1) return head;
+    head.animations = list;
+    (['cancel', 'pause', 'play', 'finish'] as const).forEach(function (m) {
+      var own = head[m].bind(head);
+      head[m] = function () { list.forEach(function (a) { if (a !== head) a[m](); }); own(); };
+    });
+    return head;
+  }
+
   // Resolve WAAPI timing from a spec + opts (+ a per-child stagger delay).
   function timing(spec: TimedSpec, opts: PlayOptions, extraDelay?: number): KeyframeAnimationOptions {
     var speed = opts.speed != null ? opts.speed : (CONFIG.defaults.speed || 1);
@@ -400,8 +452,9 @@ function createMotion(): IchavaMotionApi {
     el = toEl(el); if (!el || !spec || !spec.keyframes || !spec.keyframes.length) return null;
     if (reduceMotion()) return null;
     opts = opts || {};
-    if (spec.origin && (el as HTMLElement).style) (el as HTMLElement).style.transformOrigin = spec.origin;
-    return el.animate(spec.keyframes, timing(spec, opts));
+    var restore = spec.origin && (el as HTMLElement).style ? setInline(el, 'transformOrigin', spec.origin) : null;
+    var anim = el.animate(spec.keyframes, timing(spec, opts));
+    return restore ? onCancel(anim, restore) : anim;
   }
 
   // The SVG's animatable layers (illustration groups / paths), for child-targeting.
@@ -418,12 +471,13 @@ function createMotion(): IchavaMotionApi {
     var kids = childLayers(el);
     if (!kids || !kids.length) return playSpec(el, spec, opts);
     var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 90);
-    var last: Animation | null = null;
+    var made: Animation[] = [];
     for (var i = 0; i < kids.length; i++) {
-      if (spec.origin && (kids[i] as HTMLElement).style) (kids[i] as HTMLElement).style.transformOrigin = spec.origin;
-      last = kids[i]!.animate(spec.keyframes, timing(spec, opts, i * stagger));
+      var restore = spec.origin && (kids[i] as HTMLElement).style ? setInline(kids[i]!, 'transformOrigin', spec.origin) : null;
+      var anim = kids[i]!.animate(spec.keyframes, timing(spec, opts, i * stagger));
+      made.push(restore ? onCancel(anim, restore) : anim);
     }
-    return last;
+    return groupHandle(made);
   }
 
   // Real "Draw": measure each child path and animate its stroke-dashoffset to 0.
@@ -432,16 +486,19 @@ function createMotion(): IchavaMotionApi {
     var paths = el.querySelectorAll<SVGGeometryElement>('path, line, polyline, polygon, circle, rect');
     if (!paths.length) return playSpec(el, spec, opts);
     var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 120);
-    var last: Animation | null = null, drawn = 0;
+    var made: Animation[] = [], drawn = 0;
     for (var i = 0; i < paths.length; i++) {
       var p = paths[i]!, len = 0;
       try { len = p.getTotalLength ? p.getTotalLength() : 0; } catch (e) { len = 0; }
       if (!len) continue;
-      p.style.strokeDasharray = String(len);
-      p.style.strokeDashoffset = String(len);
-      last = p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger));
+      var undoArray = setInline(p, 'strokeDasharray', String(len));
+      var undoOffset = setInline(p, 'strokeDashoffset', String(len));
+      made.push(onCancel(
+        p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)),
+        function () { undoOffset(); undoArray(); }
+      ));
     }
-    return last;
+    return groupHandle(made);
   }
 
   function play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null {
@@ -493,6 +550,7 @@ function createMotion(): IchavaMotionApi {
    * quietly fetches a CDN is an incident.
    */
   var lottieWarned = false;
+  var lottieRiskWarned = false;
 
   function resolveLottiePlayer(): LottiePlayer | null {
     if (CONFIG.lottiePlayer) return CONFIG.lottiePlayer as LottiePlayer;
@@ -502,6 +560,25 @@ function createMotion(): IchavaMotionApi {
 
   function loadLottieWeb(el: Element | null, json: LottieJSON): null {
     if (!el) return null;
+
+    /*
+     * S11. The full lottie-web build runs `eval` on expression fields in the JSON, and this
+     * library's own premise is that JSON arrives from anywhere. So 'full' is inert until the
+     * host says, in a flag that names the risk, that its Lottie files are trusted.
+     */
+    if (!CONFIG.lottieFullAcknowledgeEvalRisk) {
+      if (!lottieRiskWarned) {
+        lottieRiskWarned = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[ichava-motion] lottie:"full" is disabled. The full lottie-web build evaluates ' +
+          'expressions in the animation JSON with eval, so untrusted JSON would run as code. ' +
+          'Use lottie:"import" or lottie_light for untrusted input, or, if every file is ' +
+          'yours, opt in with IchavaMotion.config({ lottieFullAcknowledgeEvalRisk: true }).'
+        );
+      }
+      return null;
+    }
 
     var lottie = resolveLottiePlayer();
 

@@ -1,0 +1,24 @@
+# Force LF line endings for shell scripts so Windows clones don't break
+# the shebang and CR-aware shell builtins.
+*.sh    text eol=lf
+*.bash  text eol=lf
+
+# Treat config and source as text (no normalisation surprises).
+*.json  text
+*.yml   text
+*.yaml  text
+*.mjs   text
+*.js    text
+*.scss  text
+
+# Keep the dist tarball lean: none of this is needed to consume the package.
+/.github        export-ignore
+/docs           export-ignore
+/tests          export-ignore
+/scripts        export-ignore
+/.editorconfig  export-ignore
+/.gitattributes export-ignore
+/CONTRIBUTING.md export-ignore
+/tsconfig.base.json export-ignore
+/tsconfig.json export-ignore
+/tsconfig.build.json export-ignore

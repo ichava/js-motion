@@ -1,0 +1,100 @@
+@use 'sass:map';
+
+// Ichava Motion — CSS-only animation classes (compiled → dist/ichava-motion.css).
+//
+// THIS FILE IS THE SOURCE.
+//
+// It used to be a stub: it declared an `ichm()` mixin, never called it, and carried the
+// comment "keyframes are enumerated in the compiled .css". The shipped
+// `dist/ichava-motion.css` was hand-authored, so running the documented build command
+// replaced 20 keyframes and 20 classes with a 14-line stub -- the build destroyed the
+// product. `|| true` on the build script meant it never reported anything, and because
+// `sass` is only a devDependency the failure was invisible in a fresh checkout too.
+//
+// Class rules come from one map so they cannot drift. Keyframes stay verbatim: each is a
+// bespoke curve, not something a formula should be inventing.
+
+:root {
+  --ichm-duration: 1.4s;
+  --ichm-easing: ease-in-out;
+  --ichm-iterations: infinite;
+}
+
+[class*='ichm-'] { transform-origin: center; }
+
+$families: (
+  "spin": (anim: (ichm-spin var(--ichm-duration) linear var(--ichm-iterations)), extra: ()),
+  "flip-x": (anim: (ichm-flip-x var(--ichm-duration) var(--ichm-easing) var(--ichm-iterations)), extra: (transform-style: preserve-3d,)),
+  "flip-y": (anim: (ichm-flip-y var(--ichm-duration) var(--ichm-easing) var(--ichm-iterations)), extra: (transform-style: preserve-3d,)),
+  "pulse": (anim: (ichm-pulse 1.2s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "heartbeat": (anim: (ichm-heartbeat 1s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "breathe": (anim: (ichm-breathe 3s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "bounce": (anim: (ichm-bounce 0.9s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "float": (anim: (ichm-float 2.4s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "wiggle": (anim: (ichm-wiggle 0.8s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "swing": (anim: (ichm-swing 1s var(--ichm-easing) var(--ichm-iterations)), extra: (transform-origin: top center,)),
+  "pendulum": (anim: (ichm-pendulum 1.6s var(--ichm-easing) var(--ichm-iterations)), extra: (transform-origin: top center,)),
+  "shake-x": (anim: (ichm-shake-x 0.6s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "shake-y": (anim: (ichm-shake-y 0.6s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "vibrate": (anim: (ichm-vibrate 0.3s linear var(--ichm-iterations)), extra: ()),
+  "fade": (anim: (ichm-fade var(--ichm-duration) var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "blink": (anim: (ichm-blink 1s steps(1) var(--ichm-iterations)), extra: ()),
+  "flash": (anim: (ichm-flash 1s var(--ichm-easing) 1), extra: ()),
+  "glow": (anim: (ichm-glow 1.6s var(--ichm-easing) var(--ichm-iterations)), extra: ()),
+  "tada": (anim: (ichm-tada 1s var(--ichm-easing) 1), extra: ()),
+  "pop": (anim: (ichm-pop 0.5s var(--ichm-easing) 1), extra: ()),
+);
+
+@each $name, $spec in $families {
+  .ichm-#{$name} {
+    animation: map.get($spec, anim);
+    @each $prop, $val in map.get($spec, extra) {
+      #{$prop}: $val;
+    }
+  }
+}
+
+@keyframes ichm-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+@keyframes ichm-flip-x { from { transform: perspective(400px) rotateX(0); } to { transform: perspective(400px) rotateX(360deg); } }
+
+@keyframes ichm-flip-y { from { transform: perspective(400px) rotateY(0); } to { transform: perspective(400px) rotateY(360deg); } }
+
+@keyframes ichm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+@keyframes ichm-heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.18); } 40% { transform: scale(1); } 60% { transform: scale(1.12); } }
+
+@keyframes ichm-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+@keyframes ichm-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-22%); } }
+
+@keyframes ichm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12%); } }
+
+@keyframes ichm-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-11deg); } 75% { transform: rotate(11deg); } }
+
+@keyframes ichm-swing { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(15deg); } 60% { transform: rotate(-10deg); } }
+
+@keyframes ichm-pendulum { 0%, 100% { transform: rotate(-20deg); } 50% { transform: rotate(20deg); } }
+
+@keyframes ichm-shake-x { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+
+@keyframes ichm-shake-y { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-3px); } 50% { transform: translateY(3px); } 75% { transform: translateY(-2px); } }
+
+@keyframes ichm-vibrate { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(-1.5px, 1.5px); } 66% { transform: translate(1.5px, -1.5px); } }
+
+@keyframes ichm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes ichm-blink { 0%, 40% { opacity: 1; } 50%, 90% { opacity: 0; } 100% { opacity: 1; } }
+
+@keyframes ichm-flash { 0%, 50%, 100% { opacity: 1; } 25%, 75% { opacity: 0; } }
+
+@keyframes ichm-glow { 0%, 100% { filter: drop-shadow(0 0 0 var(--ichm-glow-color, currentColor)); } 50% { filter: drop-shadow(0 0 5px var(--ichm-glow-color, currentColor)); } }
+
+@keyframes ichm-tada { 0%, 100% { transform: scale(1) rotate(0); } 30% { transform: scale(0.9) rotate(-3deg); } 60% { transform: scale(1.1) rotate(3deg); } }
+
+@keyframes ichm-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='ichm-'] { animation: none !important; }
+}
+[data-reduce-motion] [class*='ichm-'] { animation: none !important; }

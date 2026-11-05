@@ -145,6 +145,10 @@ export interface MotionCatalog {
  */
 export interface GroupAnimation extends Animation {
   animations: Animation[];
+  /** Set every child's `currentTime` to `ms` (timeline time, so the stagger is kept). */
+  seek(ms: number): void;
+  /** Resolves to this handle once every child has finished; rejects if one is cancelled. */
+  readonly finished: Promise<GroupAnimation>;
 }
 
 /** Options for `auto()` and `autoInit()`. Every field is optional. */
@@ -497,7 +501,7 @@ function createMotion(): IchavaMotionApi {
   }
 
   // Set an inline style property now; return the function that puts the author's value back.
-  function setInline(node: Element, prop: 'transformOrigin' | 'strokeDasharray' | 'strokeDashoffset', value: string): () => void {
+  function setInline(node: Element, prop: 'transformOrigin' | 'transformBox' | 'strokeDasharray' | 'strokeDashoffset', value: string): () => void {
     var style = (node as HTMLElement).style, prev = style[prop];
     style[prop] = value;
     return function () { style[prop] = prev; };
@@ -505,18 +509,24 @@ function createMotion(): IchavaMotionApi {
 
   /*
    * One handle for a group. The last child's Animation is returned (the shape callers
-   * already had), with cancel/pause/play/finish fanned out to every child and the set
-   * exposed as `animations`. A single child is returned untouched.
+   * already had), with cancel/pause/play/finish/reverse fanned out to every child and the set
+   * exposed as `animations`. `seek(ms)` sets every child's `currentTime` to the same timeline
+   * time, so the stagger between them is kept, and `finished` resolves to the handle once
+   * every child has finished (M-12, M-13). A single child is returned untouched.
    */
   function groupHandle(list: Animation[]): Animation | null {
     if (!list.length) return null;
     var head = list[list.length - 1] as GroupAnimation;
     if (list.length === 1) return head;
     head.animations = list;
-    (['cancel', 'pause', 'play', 'finish'] as const).forEach(function (m) {
+    (['cancel', 'pause', 'play', 'finish', 'reverse'] as const).forEach(function (m) {
+      if (typeof head[m] !== 'function') return; // a fake or an old engine without it
       var own = head[m].bind(head);
-      head[m] = function () { list.forEach(function (a) { if (a !== head) a[m](); }); own(); };
+      head[m] = function () { list.forEach(function (a) { if (a !== head && typeof a[m] === 'function') a[m](); }); own(); };
     });
+    head.seek = function (ms: number) { list.forEach(function (a) { a.currentTime = ms; }); };
+    var all = Promise.all(list.map(function (a) { return a.finished; })).then(function () { return head; });
+    Object.defineProperty(head, 'finished', { configurable: true, get: function () { return all; } });
     return head;
   }
 
@@ -555,6 +565,12 @@ function createMotion(): IchavaMotionApi {
     return n.length ? n : el.children;
   }
 
+  // One function running every undo in `list`. A helper, so each child's closure gets its own
+  // list rather than the loop's last one (`var` is function-scoped).
+  function undoAll(list: Array<() => void>): () => void {
+    return function () { list.forEach(function (u) { u(); }); };
+  }
+
   // Staggered per-child animation — the illustration families (Reveal/Cascade/…).
   function playChildren(el: Element, spec: MotionSpec, opts?: PlayOptions): Animation | null {
     opts = opts || {};
@@ -563,9 +579,14 @@ function createMotion(): IchavaMotionApi {
     var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 90);
     var made: Animation[] = [];
     for (var i = 0; i < kids.length; i++) {
-      var restore = spec.origin && (kids[i] as HTMLElement).style ? setInline(kids[i]!, 'transformOrigin', spec.origin) : null;
-      var anim = kids[i]!.animate(spec.keyframes, timing(spec, opts, i * stagger));
-      made.push(restore ? onCancel(anim, restore) : anim);
+      var kid = kids[i]!, undo: Array<() => void> = [];
+      var styled = !!(kid as HTMLElement).style;
+      if (spec.origin && styled) undo.push(setInline(kid, 'transformOrigin', spec.origin));
+      // An SVG child transforms around its own bounding box, not the viewport's origin, so a
+      // scale or rotate stays on the layer it animates (M-13).
+      if (styled && (kid as SVGElement).ownerSVGElement !== undefined) undo.push(setInline(kid, 'transformBox', 'fill-box'));
+      var anim = kid.animate(spec.keyframes, timing(spec, opts, i * stagger));
+      made.push(undo.length ? onCancel(anim, undoAll(undo)) : anim);
     }
     return track(groupHandle(made));
   }
@@ -585,7 +606,7 @@ function createMotion(): IchavaMotionApi {
       var undoOffset = setInline(p, 'strokeDashoffset', String(len));
       made.push(onCancel(
         p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)),
-        function () { undoOffset(); undoArray(); }
+        undoAll([undoOffset, undoArray])
       ));
     }
     return track(groupHandle(made));

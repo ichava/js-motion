@@ -133,10 +133,26 @@ motion.play(el, 'spin-subtle', { speed: 1.25 });
 ### Controlling a running animation
 
 `play()` returns the WAAPI `Animation` (or `null`). For a group family (`reveal`, `cascade`, `draw` and the
-other per-child presets) it returns the last child's `Animation` with `cancel()`, `pause()`, `play()` and
-`finish()` applied to every child, and all of them in `animations` (typed as `GroupAnimation`).
-Cancelling puts back the inline styles the animation set (`transform-origin`, and a `draw` path's
-`stroke-dasharray` and `stroke-dashoffset`), so a cancelled preview is not left hidden or re-pivoted.
+other per-child presets) it returns the last child's `Animation` with `cancel()`, `pause()`, `play()`,
+`finish()` and `reverse()` applied to every child, and all of them in `animations` (typed as
+`GroupAnimation`). Two more members act on the group as a whole:
+
+- `seek(ms)` sets every child's `currentTime` to the same timeline time, so the stagger between them is
+  kept: `handle.seek(0)` rewinds the whole group.
+- `finished` resolves to the handle once every child has finished, not only the last one, and rejects
+  if one is cancelled.
+
+```js
+const handle = IchavaMotion.play(svg, 'reveal', { iterations: 1 });
+handle.seek(400);
+await handle.finished; // every layer is in place
+handle.reverse();      // and out again
+```
+
+An animated SVG child gets `transform-box: fill-box`, so a scale or a rotate turns around the layer's
+own box rather than the SVG's origin. Cancelling puts back every inline style the animation set
+(`transform-origin`, `transform-box`, and each `draw` path's `stroke-dasharray` and `stroke-dashoffset`),
+so a cancelled preview is not left hidden or re-pivoted.
 
 ### Pausing and stopping everything
 

@@ -4,32 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
-### Security
-
-- **The release workflow reads by default and writes only in its one job.** `release.yml` declared `contents: write` for the whole workflow; it is now `contents: read` at the top and `contents: write` on the `release` job. Its `actions/setup-node` step sets `package-manager-cache: false`, so a release never restores a cache an earlier run could have written (zizmor `cache-poisoning`). `npm audit` on a freshly computed lockfile reports 0.
-- **Lottie `'full'` mode now needs `lottieFullAcknowledgeEvalRisk: true`** (S11). The full lottie-web build
-  evaluates expression fields with `eval`, and this engine treats animation JSON as arriving from anywhere.
-  Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change
-  for any host already using `'full'`: add the flag if every Lottie file you play is trusted.
-
-### Fixed
-
-- **A bad `data-motion-*` number no longer stops an element from wiring** (M6). `speed`, `delay`,
-  `iterations` and `stagger` went through a bare `parseFloat`, so `"abc"` became `NaN`, and `NaN` or a
-  negative iteration count reached `animate()`, which throws. One parser now checks each value against
-  what the Web Animations API accepts; a rejected value takes the default and logs one `console.warn`
-  naming the attribute. Every value that played before still plays, a negative `delay` included.
-- **A cancelled `draw` animation restores its strokes** (M1). `stroke-dasharray` and `stroke-dashoffset` were
-  left inline, so a cancelled preview stayed hidden.
-- **`transform-origin` is put back when an animation is cancelled** (M5, old M11). It was written inline for
-  `swing`, `pendulum` and `rock` and never restored, so it leaked into the next animation on that element.
-
-### Changed
-
-- **Documentation links point at each repository's own `docs/`** (Sim, 2026-11-03: "all ichava repos have docs in their respective repos. thats by design"). Links to `opensource.simtabi.com/documentation/ichava/...` and the `opensource.simtabi.com/products/ichava/...` homepage, which answer 404 for every ichava page, now go to the matching `docs/*.md` on GitHub, or to the repository itself. Each target was checked to exist on that repository's `main`. The manifest's `homepage` and `support.docs` follow.
-- **The author and contact address is `ichava@simtabi.com`** (W-11, Sim 2026-11-03), replacing the community address `opensource@simtabi.com` wherever this repository named it. Vulnerability reports still go to `security@simtabi.com`.
-
 ### Added
+
+- **Group handles seek, reverse and finish together** (motion plan M-12, M-13). The handle `play()` returns for a group family gains `seek(ms)`, which sets every child's `currentTime` to the same timeline time so the stagger is kept, and fans `reverse()` out to every child. Its `finished` resolves to the handle once every child has finished, where it used to be the last child's alone. `GroupAnimation` types both. `tests/group-handle.test.mjs` was written first and failed on each.
+- **Animated SVG children transform around their own box.** A per-child preset sets `transform-box: fill-box` on each SVG child it animates, so a scale or rotate turns on the layer, not the SVG's origin, and cancelling restores the author's value.
 
 - **`pauseAll()`, `resumeAll()` and `stopAll()`** (M3, WCAG 2.2.2). The engine keeps every animation it
   started until it finishes or is cancelled, so these reach animations the declarative path never handed
@@ -57,6 +35,33 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
   pinning the checksum and the absence of `eval` surface (S12).
 - `release.yml` can be dispatched by hand against a tag, as a recovery path when a tag push starts
   nothing. A first step refuses any ref that is not a `vX.Y.Z` tag.
+
+### Changed
+
+- **Documentation links point at each repository's own `docs/`** (Sim, 2026-11-03: "all ichava repos have docs in their respective repos. thats by design"). Links to `opensource.simtabi.com/documentation/ichava/...` and the `opensource.simtabi.com/products/ichava/...` homepage, which answer 404 for every ichava page, now go to the matching `docs/*.md` on GitHub, or to the repository itself. Each target was checked to exist on that repository's `main`. The manifest's `homepage` and `support.docs` follow.
+- **The author and contact address is `ichava@simtabi.com`** (W-11, Sim 2026-11-03), replacing the community address `opensource@simtabi.com` wherever this repository named it. Vulnerability reports still go to `security@simtabi.com`.
+
+### Fixed
+
+- **Cancelling a group restores every child's inline styles, not only the last child's.** The per-child and draw paths built their restore callbacks in a loop over `var` bindings, so every callback restored the last child; a cancelled multi-path `draw` left all but one path hidden. Each child now gets its own callback (`undoAll`), and a three-path draw test covers it.
+
+- **A bad `data-motion-*` number no longer stops an element from wiring** (M6). `speed`, `delay`,
+  `iterations` and `stagger` went through a bare `parseFloat`, so `"abc"` became `NaN`, and `NaN` or a
+  negative iteration count reached `animate()`, which throws. One parser now checks each value against
+  what the Web Animations API accepts; a rejected value takes the default and logs one `console.warn`
+  naming the attribute. Every value that played before still plays, a negative `delay` included.
+- **A cancelled `draw` animation restores its strokes** (M1). `stroke-dasharray` and `stroke-dashoffset` were
+  left inline, so a cancelled preview stayed hidden.
+- **`transform-origin` is put back when an animation is cancelled** (M5, old M11). It was written inline for
+  `swing`, `pendulum` and `rock` and never restored, so it leaked into the next animation on that element.
+
+### Security
+
+- **The release workflow reads by default and writes only in its one job.** `release.yml` declared `contents: write` for the whole workflow; it is now `contents: read` at the top and `contents: write` on the `release` job. Its `actions/setup-node` step sets `package-manager-cache: false`, so a release never restores a cache an earlier run could have written (zizmor `cache-poisoning`). `npm audit` on a freshly computed lockfile reports 0.
+- **Lottie `'full'` mode now needs `lottieFullAcknowledgeEvalRisk: true`** (S11). The full lottie-web build
+  evaluates expression fields with `eval`, and this engine treats animation JSON as arriving from anywhere.
+  Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change
+  for any host already using `'full'`: add the flag if every Lottie file you play is trusted.
 
 ## [0.1.0] - TBD
 

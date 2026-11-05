@@ -114,6 +114,10 @@ export interface MotionCatalog {
  */
 export interface GroupAnimation extends Animation {
     animations: Animation[];
+    /** Set every child's `currentTime` to `ms` (timeline time, so the stagger is kept). */
+    seek(ms: number): void;
+    /** Resolves to this handle once every child has finished; rejects if one is cancelled. */
+    readonly finished: Promise<GroupAnimation>;
 }
 /** Options for `auto()` and `autoInit()`. Every field is optional. */
 export interface AutoOptions {

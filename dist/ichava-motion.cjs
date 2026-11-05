@@ -731,15 +731,33 @@ function createMotion() {
 			"cancel",
 			"pause",
 			"play",
-			"finish"
+			"finish",
+			"reverse"
 		].forEach(function(m) {
+			if (typeof head[m] !== "function") return;
 			var own = head[m].bind(head);
 			head[m] = function() {
 				list.forEach(function(a) {
-					if (a !== head) a[m]();
+					if (a !== head && typeof a[m] === "function") a[m]();
 				});
 				own();
 			};
+		});
+		head.seek = function(ms) {
+			list.forEach(function(a) {
+				a.currentTime = ms;
+			});
+		};
+		var all = Promise.all(list.map(function(a) {
+			return a.finished;
+		})).then(function() {
+			return head;
+		});
+		Object.defineProperty(head, "finished", {
+			configurable: true,
+			get: function() {
+				return all;
+			}
 		});
 		return head;
 	}
@@ -774,6 +792,13 @@ function createMotion() {
 		n = el.querySelectorAll(":scope > g, :scope > path");
 		return n.length ? n : el.children;
 	}
+	function undoAll(list) {
+		return function() {
+			list.forEach(function(u) {
+				u();
+			});
+		};
+	}
 	function playChildren(el, spec, opts) {
 		opts = opts || {};
 		var kids = childLayers(el);
@@ -781,9 +806,12 @@ function createMotion() {
 		var stagger = opts.stagger != null ? opts.stagger : spec.stagger != null ? spec.stagger : 90;
 		var made = [];
 		for (var i = 0; i < kids.length; i++) {
-			var restore = spec.origin && kids[i].style ? setInline(kids[i], "transformOrigin", spec.origin) : null;
-			var anim = kids[i].animate(spec.keyframes, timing(spec, opts, i * stagger));
-			made.push(restore ? onCancel(anim, restore) : anim);
+			var kid = kids[i], undo = [];
+			var styled = !!kid.style;
+			if (spec.origin && styled) undo.push(setInline(kid, "transformOrigin", spec.origin));
+			if (styled && kid.ownerSVGElement !== void 0) undo.push(setInline(kid, "transformBox", "fill-box"));
+			var anim = kid.animate(spec.keyframes, timing(spec, opts, i * stagger));
+			made.push(undo.length ? onCancel(anim, undoAll(undo)) : anim);
 		}
 		return track(groupHandle(made));
 	}
@@ -803,10 +831,7 @@ function createMotion() {
 			if (!len) continue;
 			var undoArray = setInline(p, "strokeDasharray", String(len));
 			var undoOffset = setInline(p, "strokeDashoffset", String(len));
-			made.push(onCancel(p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)), function() {
-				undoOffset();
-				undoArray();
-			}));
+			made.push(onCancel(p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)), undoAll([undoOffset, undoArray])));
 		}
 		return track(groupHandle(made));
 	}

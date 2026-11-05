@@ -6,6 +6,7 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ### Security
 
+- **The release workflow reads by default and writes only in its one job.** `release.yml` declared `contents: write` for the whole workflow; it is now `contents: read` at the top and `contents: write` on the `release` job. Its `actions/setup-node` step sets `package-manager-cache: false`, so a release never restores a cache an earlier run could have written (zizmor `cache-poisoning`). `npm audit` on a freshly computed lockfile reports 0.
 - **Lottie `'full'` mode now needs `lottieFullAcknowledgeEvalRisk: true`** (S11). The full lottie-web build
   evaluates expression fields with `eval`, and this engine treats animation JSON as arriving from anywhere.
   Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change

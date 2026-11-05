@@ -289,7 +289,8 @@ interface LottieGlobals {
  * wiring. The module's default export is one of these, built once below.
  */
 function createMotion(): IchavaMotionApi {
-  var VERSION = '1.0.0';
+  // The package's version; tests/version.test.mjs holds the two equal (V-B7).
+  var VERSION = '0.1.0';
 
   /* ─── easings (label ↔ value; value is what WAAPI receives) ─────────────── */
   var EASINGS: Record<string, string> = {

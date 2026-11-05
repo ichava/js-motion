@@ -43,6 +43,7 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ### Fixed
 
+- **`IchavaMotion.version` is `0.1.0`, the package's version** (v0.1.0 scope V-B7). It reported `1.0.0`. `tests/version.test.mjs` holds it equal to `package.json` in the source and in every built entry point. The presets manifest's `version: '1.0.0'` is a schema version and stays.
 - **Cancelling a group restores every child's inline styles, not only the last child's.** The per-child and draw paths built their restore callbacks in a loop over `var` bindings, so every callback restored the last child; a cancelled multi-path `draw` left all but one path hidden. Each child now gets its own callback (`undoAll`), and a three-path draw test covers it.
 
 - **A bad `data-motion-*` number no longer stops an element from wiring** (M6). `speed`, `delay`,

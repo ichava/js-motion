@@ -2,7 +2,7 @@
 var IchavaMotion = (function() {
 	// src/ichava-motion.ts
 	function createMotion() {
-		var VERSION = "1.0.0";
+		var VERSION = "0.1.0";
 		var EASINGS = {
 			linear: "linear",
 			ease: "ease",

@@ -15,7 +15,7 @@ test('IchavaMotion.version is package.json version', () => {
 test('every built entry point carries the same version', () => {
   for (const f of ['ichava-motion.js', 'ichava-motion.mjs', 'ichava-motion.cjs', 'ichava-motion.min.js']) {
     const src = readFileSync(new URL(`../dist/${f}`, import.meta.url), 'utf8');
-    assert.ok(src.includes(`"${pkg.version}"`) || src.includes(`'${pkg.version}'`), `${f} does not carry ${pkg.version}`);
-    assert.ok(!/VERSION\s*=\s*["']1\.0\.0["']/.test(src), `${f} still says 1.0.0`);
+    assert.ok(['"', "'", '`'].some((q) => src.includes(`${q}${pkg.version}${q}`)), `${f} does not carry ${pkg.version}`);
+    assert.ok(!/["'`]1\.0\.0["'`]/.test(src), `${f} still says 1.0.0`);
   }
 });

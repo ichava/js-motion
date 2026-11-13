@@ -4,10 +4,6 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
-### Changed
-
-- `docs/architecture.md` names the browser and landing that use the engine: icon-browser and ichava.com, since react-icon-browser and react-landingpage were folded into them. The comment in `src/ichava-motion.ts` that names react-icon-browser is left, because changing it would change the committed `dist/` source maps.
-
 ## [0.1.0] - 2026-11-13
 
 First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.
@@ -48,6 +44,8 @@ First release of `@ichava/js-motion`. The repository is published as a single co
 - 240 presets across 40 families, `data-*` declarative wiring through the opt-in `autoInit()`, `IchavaMotion.create()` for independent engines and `IchavaMotion.catalog()` for building a picker.
 
 ### Changed
+
+- `docs/architecture.md` names the browser and landing that use the engine: icon-browser and ichava.com, since react-icon-browser and react-landingpage were folded into them. The comment in `src/ichava-motion.ts` that names react-icon-browser is left, because changing it would change the committed `dist/` source maps.
 
 - **Documentation links point at each repository's own `docs/`** (Sim, 2026-11-03: "all ichava repos have docs in their respective repos. thats by design"). Links to `opensource.simtabi.com/documentation/ichava/...` and the `opensource.simtabi.com/products/ichava/...` homepage, which answer 404 for every ichava page, now go to the matching `docs/*.md` on GitHub, or to the repository itself. Each target was checked to exist on that repository's `main`. The manifest's `homepage` and `support.docs` follow.
 - **The author and contact address is `ichava@simtabi.com`** (W-11, Sim 2026-11-03), replacing the community address `opensource@simtabi.com` wherever this repository named it. Vulnerability reports still go to `security@simtabi.com`.

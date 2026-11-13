@@ -1,5 +1,5 @@
 // catalog(): the families and variants the preset registry is generated from, typed, so a
-// picker (react-icon-browser's motion menu) can list them without keeping its own copy
+// picker (icon-browser's motion menu) can list them without keeping its own copy
 // of the tables. Run: node --test tests/*.test.mjs
 
 import assert from 'node:assert/strict';

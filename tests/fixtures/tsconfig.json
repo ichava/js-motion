@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The point of this fixture is to typecheck the hand-written declaration file, so
+    // it must not be skipped as a library file.
+    "skipLibCheck": false
+  },
+  "include": ["types-usage.ts", "api-contract.ts"]
+}

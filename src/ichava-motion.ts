@@ -1,0 +1,933 @@
+/*
+ * Module scope, not an IIFE.
+ *
+ * This file was `(function (window, document) { ... })(window, document)`. That form reads
+ * `window` at module scope, so `import`ing or `require`ing it under Node or during SSR
+ * threw before a single line of the library ran -- and `dist/ichava-motion.js` was a
+ * byte-identical hand copy of this file, so there was no build to fix it in. The `exports`
+ * map advertised `require` support the package could not honour.
+ *
+ * Every DOM access inside the library is already inside a function body, so nothing here
+ * touches the document until a caller asks it to. The two exceptions were the global
+ * assignment and the auto-scan at the bottom; both are now guarded.
+ */
+'use strict';
+
+/* ─── public types ──────────────────────────────────────────────────────────
+ * These were hand-written in src/ichava-motion.d.ts while this file was plain JS.
+ * They are now the source of dist/ichava-motion.d.ts, and tests/types.test.mjs holds
+ * them equivalent to the hand-written contract in tests/fixtures/handwritten-api.d.ts.
+ * Type-only: nothing here emits code, so the default export stays the only export.
+ */
+export type Direction = 'normal' | 'reverse' | 'alternate';
+
+/** A single generated preset -- the shape every entry in `presets()` has. */
+export interface MotionSpec {
+  id: string;
+  label: string;
+  keyframes: Keyframe[];
+  /** base duration (ms) at 1x speed */
+  base: number;
+  direction: Direction;
+  /** Infinity for a looping preset, 1 for a one-shot family */
+  iterations: number;
+  once: boolean;
+  /** transform-origin applied before animating (swing/pendulum/rock) */
+  origin?: string;
+  /** true only for families that need real inline SVG paths (Draw) */
+  domOnly: boolean;
+  /** real stroke-draw: animates each child path's stroke-dashoffset */
+  draw: boolean;
+  /** animates the element's child layers with a stagger, instead of the root */
+  perChild: boolean;
+  /** per-child delay (ms), for perChild/draw families */
+  stagger?: number;
+  /** the family id this preset variant was generated from */
+  family: string;
+}
+
+export interface PlayOptions {
+  /** logarithmic speed multiplier; 1 = base duration */
+  speed?: number;
+  /** overrides the computed duration entirely (ms) */
+  duration?: number;
+  /** a named easing (spring/back/...), a raw cubic-bezier()/steps()/linear/ease* value, or a name registered via registerEasing */
+  easing?: string;
+  delay?: number;
+  /** Infinity to loop; overrides the preset's own iteration count */
+  iterations?: number | 'infinite';
+  direction?: Direction;
+  /** per-child stagger override (ms), for perChild/draw families */
+  stagger?: number;
+}
+
+export interface MotionConfigDefaults {
+  duration?: number | null;
+  easing?: string;
+  delay?: number;
+  iterations?: number | null;
+  direction?: Direction | null;
+  speed?: number;
+  trigger?: 'load' | 'loop' | 'hover' | 'click' | 'visible';
+}
+
+export interface MotionConfig {
+  defaults?: MotionConfigDefaults;
+  /** 'off': ignore Lottie JSON. 'import': convert via the optional ./lottie adapter. 'full': hand off to a supplied lottie-web player. */
+  lottie?: 'off' | 'import' | 'full';
+  /** a lottie-web instance you provide; this library never fetches one itself */
+  lottiePlayer?: unknown;
+  /**
+   * Required, as `true`, for `lottie: 'full'` to do anything. The full lottie-web build
+   * evaluates expression fields in the animation JSON with `eval`, so `'full'` on JSON from
+   * an untrusted source is code execution in your page. Set this only when every Lottie
+   * file you play is yours, or your player is lottie_light. Defaults to false.
+   */
+  lottieFullAcknowledgeEvalRisk?: boolean;
+  /** 'respect' (default): honour prefers-reduced-motion and [data-reduce-motion]. 'off': ignore it. */
+  reduceMotion?: 'respect' | 'off';
+}
+
+/** Bodymovin/Lottie JSON, detected by animate() via its layers/v/ip fields. */
+export interface LottieJSON {
+  v: string;
+  ip: number;
+  layers: unknown[];
+  [key: string]: unknown;
+}
+
+export interface FamilySpec {
+  id: string;
+  label: string;
+  base: number;
+  kf: (amp: number) => Keyframe[];
+  origin?: string;
+  once?: boolean;
+  domOnly?: boolean;
+  perChild?: boolean;
+  draw?: boolean;
+  stagger?: number;
+}
+
+export interface VariantSpec {
+  s: string;
+  a: number;
+  d: number;
+  r: boolean;
+}
+
+/**
+ * What `playSpec()`/`fromJSON()` actually read at runtime: `keyframes` plus
+ * whichever timing hints are present. Every other `MotionSpec` field
+ * (`id`/`label`/`once`/`domOnly`/`draw`/`perChild`/`family`) is ignored --
+ * those only matter to `play()`'s id-based routing.
+ */
+export interface PlaySpec {
+  keyframes: Keyframe[];
+  /** takes precedence over `base` when both are present */
+  duration?: number;
+  base?: number;
+  direction?: Direction;
+  origin?: string;
+}
+
+/** What `catalog()` returns. */
+export interface MotionCatalog {
+  families: FamilySpec[];
+  variants: VariantSpec[];
+}
+
+/**
+ * What `play()` returns for a group animation (a `perChild` or `draw` family): the last
+ * child's `Animation`, with `cancel`, `pause`, `play` and `finish` fanned out to every child
+ * and the full set in `animations`. Cast to this to read `animations`; it is still an
+ * `Animation`, so existing code that only cancels or awaits it keeps working.
+ */
+export interface GroupAnimation extends Animation {
+  animations: Animation[];
+  /** Set every child's `currentTime` to `ms` (timeline time, so the stagger is kept). */
+  seek(ms: number): void;
+  /** Resolves to this handle once every child has finished; rejects if one is cancelled. */
+  readonly finished: Promise<GroupAnimation>;
+}
+
+/** Options for `auto()` and `autoInit()`. Every field is optional. */
+export interface AutoOptions {
+  /**
+   * Also wire `[data-ichava-motion]` elements added under the root later, through one
+   * MutationObserver; a wired element removed from the root is unwired. `destroy()`
+   * disconnects it. Off by default.
+   */
+  observe?: boolean;
+  /**
+   * A pause button the HOST renders (an element or a selector); the engine renders
+   * nothing. A click toggles `pauseAll()`/`resumeAll()` and keeps `aria-pressed` in step,
+   * which is the WCAG 2.2.2 mechanism for motion that loops. `destroy()` detaches it.
+   */
+  pauseControl?: Element | string;
+}
+
+export interface IchavaMotionApi {
+  readonly version: string;
+
+  /** Merge partial config over the current settings (prototype-pollution-safe). Returns `this` for chaining. */
+  config(overrides: MotionConfig): IchavaMotionApi;
+
+  /** Route by content: a registered preset id, our MotionSpec JSON, or bodymovin/Lottie JSON. */
+  animate(el: Element | string, source: string | MotionSpec | LottieJSON, opts?: PlayOptions): Animation | null;
+
+  /** Play a registered preset by id. Handles perChild/draw routing internally. Returns null if unregistered, reduced-motion, or the id has no keyframes. */
+  play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null;
+
+  /** Play a raw spec directly -- no id lookup, no perChild/draw routing (single-element only). */
+  playSpec(el: Element | string, spec: PlaySpec, opts?: PlayOptions): Animation | null;
+
+  /** Play a plain JSON definition ({keyframes, duration|base, easing, direction, iterations}). `{trigger:'loop'}` loops it. */
+  fromJSON(el: Element | string, def: PlaySpec, opts?: PlayOptions & { trigger?: 'loop' }): Animation | null;
+
+  /** Declaratively wire every `[data-ichava-motion]` element under `root` (default: document). */
+  auto(root?: ParentNode, options?: AutoOptions): void;
+  /** The same, on the document, with options: `auto({ observe: true })`. */
+  auto(options: AutoOptions): void;
+
+  /**
+   * Undo `auto()` for every wired element under `root` (default: document), and `root`
+   * itself: its listeners and visibility observer are removed and its running animation is
+   * cancelled. A later `auto()` can wire it again.
+   */
+  unwire(root?: ParentNode): void;
+
+  /**
+   * Tear this engine down: `unwire(document)`, `stopAll()`, and disconnect every observer,
+   * pause control and the reduced-motion listener it installed. Registered presets and
+   * config are kept, so the engine can be used again.
+   */
+  destroy(): void;
+
+  /** Pause every animation this engine started that is still live. Returns `this`. */
+  pauseAll(): IchavaMotionApi;
+
+  /** Resume every animation `pauseAll()` (or anything else) paused. A no-op under reduced motion. Returns `this`. */
+  resumeAll(): IchavaMotionApi;
+
+  /** Cancel every animation this engine started; they are forgotten and cannot be resumed. Returns `this`. */
+  stopAll(): IchavaMotionApi;
+
+  /** The full generated preset registry, keyed by id. */
+  presets(): Record<string, MotionSpec>;
+  presetIds(): string[];
+
+  /** Named easing -> WAAPI value map (spring/back/steps(8)/...). */
+  easings(): Record<string, string>;
+
+  /** Register (or overwrite) one preset directly. Returns `this` for chaining. */
+  register(id: string, spec: Partial<MotionSpec>): IchavaMotionApi;
+
+  /** Add a family; regenerates the full preset registry against every existing variant. Returns `this` for chaining. */
+  registerFamily(family: FamilySpec): IchavaMotionApi;
+
+  /** Add a variant; regenerates the full preset registry against every existing family. Returns `this` for chaining. */
+  registerVariant(variant: VariantSpec): IchavaMotionApi;
+
+  /** Register a named easing (e.g. 'elastic' -> a cubic-bezier() value). */
+  registerEasing(name: string, value: string): IchavaMotionApi;
+
+  /**
+   * A new, independent engine: its own preset registry, easings, families, variants and
+   * config, starting from the built-in set. Registering or configuring it never reaches
+   * this instance or any other, so two embeds on one page can differ.
+   *
+   *   const motion = IchavaMotion.create().config({ reduceMotion: 'respect' });
+   */
+  create(): IchavaMotionApi;
+
+  /**
+   * The families and variants the preset registry is generated from, as copies: every
+   * preset is one family played in one variant (`presetIds().length` is their product).
+   * A picker can list them without keeping its own tables. Follows `registerFamily()`
+   * and `registerVariant()` on this instance.
+   */
+  catalog(): MotionCatalog;
+
+  /**
+   * Opt in to the declarative `[data-ichava-motion]` auto-scan on DOMContentLoaded.
+   * Off by default (WCAG 2.2.2): merely loading the script must not start looping
+   * animation. No-ops outside a DOM (SSR/Node). Returns `this` for chaining.
+   * Takes the same options as `auto()`, e.g. `autoInit({ pauseControl: '#pause-motion' })`.
+   */
+  autoInit(options?: AutoOptions): IchavaMotionApi;
+}
+
+/* ─── internal types ─────────────────────────────────────────────────────── */
+
+/** What `timing()` reads: a played spec plus the hints a registered preset may carry. */
+interface TimedSpec extends PlaySpec {
+  iterations?: number | 'infinite';
+  easing?: string;
+}
+
+interface Config {
+  defaults: MotionConfigDefaults;
+  lottie: NonNullable<MotionConfig['lottie']>;
+  lottiePlayer: unknown;
+  lottieFullAcknowledgeEvalRisk: boolean;
+  reduceMotion: NonNullable<MotionConfig['reduceMotion']>;
+}
+
+interface LottiePlayer {
+  loadAnimation(params: { container: Element; renderer: string; loop: boolean; autoplay: boolean; animationData: unknown }): unknown;
+}
+
+/** The globals a page may provide: the optional Lottie adapter and a lottie-web player. */
+interface LottieGlobals {
+  IchavaMotionLottie?: { toSpec(json: LottieJSON): PlaySpec | null };
+  lottie?: LottiePlayer;
+}
+
+/*
+ * One engine instance: its own easings, families, variants, preset registry, config and
+ * wiring. The module's default export is one of these, built once below.
+ */
+function createMotion(): IchavaMotionApi {
+  // The package's version; tests/version.test.mjs holds the two equal (V-B7).
+  var VERSION = '0.1.0';
+
+  /* ─── easings (label ↔ value; value is what WAAPI receives) ─────────────── */
+  var EASINGS: Record<string, string> = {
+    linear: 'linear', ease: 'ease', 'ease-in': 'ease-in', 'ease-out': 'ease-out', 'ease-in-out': 'ease-in-out',
+    spring: 'cubic-bezier(.34,1.56,.64,1)', back: 'cubic-bezier(.68,-.55,.27,1.55)', 'steps(8)': 'steps(8)',
+    'ease-in-quad': 'cubic-bezier(.55,.06,.68,.19)', 'ease-out-cubic': 'cubic-bezier(.22,.61,.36,1)'
+  };
+  function resolveEasing(e?: string | null): string {
+    if (!e) return 'ease-in-out';
+    if (EASINGS[e]) return EASINGS[e]!;
+    // pass raw cubic-bezier()/steps()/named through if valid. Each number is `\d+(\.\d+)?` or
+    // `\.\d+`, which accepts what `\d*\.?\d+` did but can read a digit run only one way, so a
+    // long crafted value is rejected in linear time (CodeQL js/polynomial-redos).
+    if (/^(linear|ease(-in|-out|-in-out)?|step-(start|end)|steps\([^)]+\)|cubic-bezier\(\s*-?(?:\d+(?:\.\d+)?|\.\d+)\s*(,\s*-?(?:\d+(?:\.\d+)?|\.\d+)\s*){3}\))$/.test(String(e).trim())) return e;
+    return 'ease-in-out';
+  }
+
+  /* ─── family × variant preset generator (mirrors the app's MotionEngine) ── */
+  var P = 'perspective(400px)';
+  /*
+   * Glow's colour: the `--ichm-glow-color` custom property when the page sets it, else
+   * the icon's own colour. A host that wants the glow to follow its accent sets
+   * `--ichm-glow-color: var(--accent)` on a container (react-icon-browser does).
+   */
+  var GLOW = 'var(--ichm-glow-color, currentColor)';
+  var VARIANTS: VariantSpec[] = [
+    { s: '', a: 1, d: 1, r: false }, { s: ' · Reverse', a: 1, d: 1, r: true },
+    { s: ' · Subtle', a: 0.55, d: 1.15, r: false }, { s: ' · Subtle · Reverse', a: 0.55, d: 1.15, r: true },
+    { s: ' · Bold', a: 1.7, d: 0.8, r: false }, { s: ' · Bold · Reverse', a: 1.7, d: 0.8, r: true }
+  ];
+  var FAMILIES: FamilySpec[] = [
+    { id: 'spin', label: 'Spin', base: 1400, kf: function () { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }]; } },
+    { id: 'spin-y', label: 'Spin Y', base: 1600, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
+    { id: 'spin-tilt', label: 'Spin Tilt', base: 1600, kf: function () { return [{ transform: P + ' rotateZ(0deg) rotateX(20deg)' }, { transform: P + ' rotateZ(360deg) rotateX(20deg)' }]; } },
+    { id: 'flip-x', label: 'Flip X', base: 1400, kf: function () { return [{ transform: P + ' rotateX(0deg)' }, { transform: P + ' rotateX(360deg)' }]; } },
+    { id: 'flip-y', label: 'Flip Y', base: 1400, kf: function () { return [{ transform: P + ' rotateY(0deg)' }, { transform: P + ' rotateY(360deg)' }]; } },
+    { id: 'roll', label: 'Roll', base: 1200, kf: function (a: number) { return [{ transform: 'translateX(' + (-24 * a) + '%) rotate(' + (-120 * a) + 'deg)', opacity: 0.4 }, { transform: 'translateX(0) rotate(0)', opacity: 1 }]; } },
+    { id: 'orbit', label: 'Orbit', base: 2000, kf: function (a: number) { return [{ transform: 'rotate(0deg) translateX(' + (6 * a) + 'px) rotate(0deg)' }, { transform: 'rotate(360deg) translateX(' + (6 * a) + 'px) rotate(-360deg)' }]; } },
+    { id: 'pulse', label: 'Pulse', base: 1200, kf: function (a: number) { return [{ opacity: 1 }, { opacity: Math.max(0.1, 1 - 0.65 * a) }, { opacity: 1 }]; } },
+    { id: 'heartbeat', label: 'Heartbeat', base: 1000, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.18 * a) + ')' }, { transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.12 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'breathe', label: 'Breathe', base: 3000, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.08 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'zoom-in', label: 'Zoom In', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(' + (1 - 0.4 * a) + ')', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }]; } },
+    { id: 'zoom-out', label: 'Zoom Out', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(' + (1 + 0.4 * a) + ')', opacity: 0 }]; } },
+    { id: 'pop', label: 'Pop', base: 500, once: true, kf: function (a: number) { return [{ transform: 'scale(1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ')' }, { transform: 'scale(1)' }]; } },
+    { id: 'rubber-band', label: 'Rubber Band', base: 900, once: true, kf: function (a: number) { return [{ transform: 'scale(1,1)' }, { transform: 'scale(' + (1 + 0.25 * a) + ',' + (1 - 0.25 * a) + ')' }, { transform: 'scale(' + (1 - 0.15 * a) + ',' + (1 + 0.15 * a) + ')' }, { transform: 'scale(' + (1 + 0.05 * a) + ',' + (1 - 0.05 * a) + ')' }, { transform: 'scale(1,1)' }]; } },
+    { id: 'jello', label: 'Jello', base: 900, once: true, kf: function (a: number) { return [{ transform: 'skewX(0deg) skewY(0deg)' }, { transform: 'skewX(' + (-12 * a) + 'deg) skewY(' + (-12 * a) + 'deg)' }, { transform: 'skewX(' + (6 * a) + 'deg) skewY(' + (6 * a) + 'deg)' }, { transform: 'skewX(' + (-3 * a) + 'deg) skewY(' + (-3 * a) + 'deg)' }, { transform: 'skewX(0) skewY(0)' }]; } },
+    { id: 'tada', label: 'Tada', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'scale(1) rotate(0)' }, { transform: 'scale(' + (1 - 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (3 * a) + 'deg)' }, { transform: 'scale(' + (1 + 0.1 * a) + ') rotate(' + (-3 * a) + 'deg)' }, { transform: 'scale(1) rotate(0)' }]; } },
+    { id: 'bounce', label: 'Bounce', base: 900, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-22 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'float', label: 'Float', base: 2400, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-12 * a) + '%)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'hop', label: 'Hop', base: 800, kf: function (a: number) { return [{ transform: 'translateY(0) scaleY(1)' }, { transform: 'translateY(0) scaleY(0.86)' }, { transform: 'translateY(' + (-24 * a) + '%) scaleY(1.05)' }, { transform: 'translateY(0) scaleY(1)' }]; } },
+    { id: 'slide-up', label: 'Slide Up', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateY(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
+    { id: 'slide-down', label: 'Slide Down', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateY(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }]; } },
+    { id: 'slide-left', label: 'Slide Left', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
+    { id: 'slide-right', label: 'Slide Right', base: 900, once: true, kf: function (a: number) { return [{ transform: 'translateX(' + (-30 * a) + '%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }]; } },
+    { id: 'shake-x', label: 'Shake X', base: 600, kf: function (a: number) { return [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-3 * a) + 'px)' }, { transform: 'translateX(' + (3 * a) + 'px)' }, { transform: 'translateX(' + (-2 * a) + 'px)' }, { transform: 'translateX(0)' }]; } },
+    { id: 'shake-y', label: 'Shake Y', base: 600, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-3 * a) + 'px)' }, { transform: 'translateY(' + (3 * a) + 'px)' }, { transform: 'translateY(' + (-2 * a) + 'px)' }, { transform: 'translateY(0)' }]; } },
+    { id: 'vibrate', label: 'Vibrate', base: 300, kf: function (a: number) { return [{ transform: 'translate(0,0)' }, { transform: 'translate(' + (-1.5 * a) + 'px,' + (1.5 * a) + 'px)' }, { transform: 'translate(' + (1.5 * a) + 'px,' + (-1.5 * a) + 'px)' }, { transform: 'translate(0,0)' }]; } },
+    { id: 'wobble', label: 'Wobble', base: 1000, once: true, kf: function (a: number) { return [{ transform: 'translateX(0) rotate(0)' }, { transform: 'translateX(' + (-12 * a) + '%) rotate(' + (-5 * a) + 'deg)' }, { transform: 'translateX(' + (8 * a) + '%) rotate(' + (3 * a) + 'deg)' }, { transform: 'translateX(' + (-4 * a) + '%) rotate(' + (-2 * a) + 'deg)' }, { transform: 'translateX(0) rotate(0)' }]; } },
+    { id: 'wiggle', label: 'Wiggle', base: 800, kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-11 * a) + 'deg)' }, { transform: 'rotate(' + (11 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'swing', label: 'Swing', base: 1000, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (15 * a) + 'deg)' }, { transform: 'rotate(' + (-10 * a) + 'deg)' }, { transform: 'rotate(' + (5 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'pendulum', label: 'Pendulum', base: 1600, origin: 'top center', kf: function (a: number) { return [{ transform: 'rotate(' + (-20 * a) + 'deg)' }, { transform: 'rotate(' + (20 * a) + 'deg)' }, { transform: 'rotate(' + (-20 * a) + 'deg)' }]; } },
+    { id: 'rock', label: 'Rock', base: 1200, origin: 'bottom center', kf: function (a: number) { return [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + (-8 * a) + 'deg)' }, { transform: 'rotate(' + (8 * a) + 'deg)' }, { transform: 'rotate(0deg)' }]; } },
+    { id: 'fade', label: 'Fade', base: 1400, kf: function (a: number) { return [{ opacity: Math.max(0, 1 - a) }, { opacity: 1 }]; } },
+    { id: 'blink', label: 'Blink', base: 1000, kf: function () { return [{ opacity: 1 }, { opacity: 1 }, { opacity: 0 }, { opacity: 0 }, { opacity: 1 }]; } },
+    { id: 'flash', label: 'Flash', base: 1000, once: true, kf: function () { return [{ opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }]; } },
+    { id: 'glow', label: 'Glow', base: 1600, kf: function (a: number) { return [{ filter: 'drop-shadow(0 0 0 ' + GLOW + ')' }, { filter: 'drop-shadow(0 0 ' + (5 * a) + 'px ' + GLOW + ')' }, { filter: 'drop-shadow(0 0 0 ' + GLOW + ')' }]; } },
+    { id: 'draw', label: 'Draw', base: 1400, once: true, domOnly: true, draw: true, stagger: 120, kf: function () { return [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }]; } },
+    /* illustration families — animate the SVG's child layers, not just the root */
+    { id: 'reveal', label: 'Reveal', base: 700, once: true, perChild: true, stagger: 90, kf: function (a: number) { return [{ opacity: 0, transform: 'translateY(' + (14 * a) + 'px)' }, { opacity: 1, transform: 'translateY(0)' }]; } },
+    { id: 'cascade', label: 'Cascade', base: 700, once: true, perChild: true, stagger: 110, kf: function (a: number) { return [{ opacity: 0, transform: 'scale(' + (1 - 0.3 * a) + ')' }, { opacity: 1, transform: 'scale(1)' }]; } },
+    { id: 'assemble', label: 'Assemble', base: 800, once: true, perChild: true, stagger: 90, kf: function (a: number) { return [{ opacity: 0, transform: 'translateX(' + (-18 * a) + 'px) rotate(' + (-8 * a) + 'deg)' }, { opacity: 1, transform: 'translateX(0) rotate(0)' }]; } },
+    { id: 'parallax', label: 'Parallax', base: 2600, perChild: true, stagger: 160, kf: function (a: number) { return [{ transform: 'translateY(0)' }, { transform: 'translateY(' + (-7 * a) + 'px)' }, { transform: 'translateY(0)' }]; } }
+  ];
+
+  var PRESETS: Record<string, MotionSpec> = {}; // id → { id, label, keyframes, base, direction, iterations, once, origin, domOnly }
+  function slugVariant(s: string): string { return s ? '-' + s.replace(/[·\s]+/g, '').toLowerCase() : ''; }
+  function buildPresets(): void {
+    PRESETS = {};
+    for (var i = 0; i < FAMILIES.length; i++) {
+      var f = FAMILIES[i]!;
+      for (var j = 0; j < VARIANTS.length; j++) {
+        var v = VARIANTS[j]!;
+        var id = f.id + slugVariant(v.s);
+        PRESETS[id] = {
+          id: id, label: f.label + v.s, keyframes: f.kf(v.a), base: Math.round(f.base * v.d),
+          direction: v.r ? 'reverse' : 'normal', iterations: f.once ? 1 : Infinity, once: !!f.once,
+          origin: f.origin, domOnly: !!f.domOnly, draw: !!f.draw, perChild: !!f.perChild, stagger: f.stagger, family: f.id
+        };
+      }
+    }
+  }
+  buildPresets();
+
+  /* ─── config ─────────────────────────────────────────────────────────────── */
+  var CONFIG: Config = {
+    defaults: { duration: null, easing: 'ease-in-out', delay: 0, iterations: null, direction: null, speed: 1, trigger: 'load' },
+    lottie: 'off',        // 'off' | 'import' | 'full'
+    lottiePlayer: null,   // a lottie-web instance you supply; never fetched for you
+    lottieFullAcknowledgeEvalRisk: false, // 'full' stays inert until this is true (S11)
+    reduceMotion: 'respect' // 'respect' | 'off'
+  };
+  /*
+   * Keys that must never be copied, however they arrive.
+   *
+   * `hasOwnProperty` is not a defence against prototype pollution and reading it
+   * as one is the usual mistake: `JSON.parse('{"__proto__":{"x":1}}')` produces an
+   * OWN `__proto__` property, so the guard passes and `t[k] = s[k]` then writes
+   * through to Object.prototype. Config reaches this function from JSON -- a
+   * preset manifest, a data-* attribute, an API payload -- so the untrusted path
+   * is the normal path. (`M4`.)
+   *
+   * A plain array, deliberately. The first fix here used an object literal --
+   * `{ __proto__: 1, ... }` -- which does not create a `__proto__` KEY at all: it
+   * sets that object's prototype, leaving the block list empty and the guard
+   * inert. The test caught it. Same trap, one level up.
+   */
+  var BLOCKED_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+  function assign(t: any, ...sources: any[]): any;
+  function assign(t: any): any {
+    for (var i = 1; i < arguments.length; i++) {
+      var s = arguments[i];
+      if (!s) continue;
+      for (var k in s) {
+        if (!Object.prototype.hasOwnProperty.call(s, k)) continue;
+        if (BLOCKED_KEYS.indexOf(k) !== -1) continue;
+        if (t[k] && typeof t[k] === 'object' && typeof s[k] === 'object' && !Array.isArray(s[k])) assign(t[k], s[k]);
+        else t[k] = s[k];
+      }
+    }
+    return t;
+  }
+
+  function reduceMotion(): boolean {
+    if (CONFIG.reduceMotion === 'off') return false;
+    /*
+     * Fail CLOSED: when the preference cannot be read, assume it is set.
+     *
+     * This returned false on error, which means "the user has not asked for less
+     * motion" -- so the one case where we genuinely do not know was resolved by
+     * animating anyway. For an accessibility preference the safe default is the
+     * accommodating one; a missing animation is a cosmetic complaint, unwanted
+     * motion can be a vestibular one. (`M8`.)
+     */
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        || document.documentElement.hasAttribute('data-reduce-motion');
+    } catch (e) { return true; }
+  }
+
+  /*
+   * ─── live handles (M3) ──────────────────────────────────────────────────────
+   * Every handle the engine returns is kept here until it finishes or is cancelled, so
+   * pauseAll/resumeAll/stopAll can reach animations whose handles the caller dropped --
+   * the declarative path never hands them out at all. WCAG 2.2.2 needs that reach.
+   */
+  var LIVE = new Set<Animation>();
+  // Undo functions for what this engine attached outside an element: the reduced-motion
+  // listener, pause controls, mutation observers. destroy() runs and clears them.
+  var TEARDOWN: Array<() => void> = [];
+  var reduceBound = false;
+
+  function track(anim: Animation | null): Animation | null {
+    if (!anim) return anim;
+    LIVE.add(anim);
+    if (typeof anim.addEventListener === 'function') {
+      var drop = function () { LIVE.delete(anim!); };
+      anim.addEventListener('finish', drop);
+      anim.addEventListener('cancel', drop);
+    }
+    bindReducedMotion();
+    return anim;
+  }
+
+  /*
+   * A user who turns on "reduce motion" while the page is open is honoured then, not on
+   * the next play. Bound lazily on the first animation, so importing the module touches no
+   * DOM, and once per engine.
+   */
+  function bindReducedMotion(): void {
+    if (reduceBound || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    var mq: MediaQueryList;
+    try { mq = window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (e) { return; }
+    if (!mq || typeof mq.addEventListener !== 'function') return;
+    var onChange = function () { if (reduceMotion()) stopAll(); };
+    mq.addEventListener('change', onChange);
+    reduceBound = true;
+    TEARDOWN.push(function () { mq.removeEventListener('change', onChange); reduceBound = false; });
+  }
+
+  function pauseAll(): void { LIVE.forEach(function (a) { a.pause(); }); }
+  function resumeAll(): void { if (reduceMotion()) return; LIVE.forEach(function (a) { a.play(); }); }
+  function stopAll(): void {
+    var all = Array.from(LIVE);
+    LIVE.clear();
+    all.forEach(function (a) { a.cancel(); });
+  }
+
+  /* ─── player ─────────────────────────────────────────────────────────────── */
+  function toEl(target: Element | string | null): Element | null { return typeof target === 'string' ? document.querySelector(target) : target; }
+
+  /*
+   * Run `undo` when the animation is cancelled, so inline styles written for it do not
+   * outlive it (M1, M5). Fakes and old engines without addEventListener are tolerated.
+   */
+  function onCancel(anim: Animation, undo: () => void): Animation {
+    if (anim && typeof anim.addEventListener === 'function') anim.addEventListener('cancel', undo);
+    return anim;
+  }
+
+  // Set an inline style property now; return the function that puts the author's value back.
+  function setInline(node: Element, prop: 'transformOrigin' | 'transformBox' | 'strokeDasharray' | 'strokeDashoffset', value: string): () => void {
+    var style = (node as HTMLElement).style, prev = style[prop];
+    style[prop] = value;
+    return function () { style[prop] = prev; };
+  }
+
+  /*
+   * One handle for a group. The last child's Animation is returned (the shape callers
+   * already had), with cancel/pause/play/finish/reverse fanned out to every child and the set
+   * exposed as `animations`. `seek(ms)` sets every child's `currentTime` to the same timeline
+   * time, so the stagger between them is kept, and `finished` resolves to the handle once
+   * every child has finished (M-12, M-13). A single child is returned untouched.
+   */
+  function groupHandle(list: Animation[]): Animation | null {
+    if (!list.length) return null;
+    var head = list[list.length - 1] as GroupAnimation;
+    if (list.length === 1) return head;
+    head.animations = list;
+    (['cancel', 'pause', 'play', 'finish', 'reverse'] as const).forEach(function (m) {
+      if (typeof head[m] !== 'function') return; // a fake or an old engine without it
+      var own = head[m].bind(head);
+      head[m] = function () { list.forEach(function (a) { if (a !== head && typeof a[m] === 'function') a[m](); }); own(); };
+    });
+    head.seek = function (ms: number) { list.forEach(function (a) { a.currentTime = ms; }); };
+    var all = Promise.all(list.map(function (a) { return a.finished; })).then(function () { return head; });
+    Object.defineProperty(head, 'finished', { configurable: true, get: function () { return all; } });
+    return head;
+  }
+
+  // Resolve WAAPI timing from a spec + opts (+ a per-child stagger delay).
+  function timing(spec: TimedSpec, opts: PlayOptions, extraDelay?: number): KeyframeAnimationOptions {
+    var speed = opts.speed != null ? opts.speed : (CONFIG.defaults.speed || 1);
+    var base = spec.duration != null ? spec.duration : spec.base;
+    var duration = opts.duration != null ? opts.duration : Math.max(80, (base || 1000) / Math.max(0.1, speed));
+    var iterations: number | 'infinite' = opts.iterations != null ? opts.iterations : (spec.iterations != null ? spec.iterations : (CONFIG.defaults.iterations != null ? CONFIG.defaults.iterations : Infinity));
+    if (iterations === 'infinite') iterations = Infinity;
+    var dir = opts.direction || spec.direction || CONFIG.defaults.direction || 'normal';
+    return {
+      duration: duration,
+      easing: resolveEasing(opts.easing || spec.easing || CONFIG.defaults.easing),
+      delay: (opts.delay != null ? opts.delay : (CONFIG.defaults.delay || 0)) + (extraDelay || 0),
+      direction: dir === 'reverse' ? 'reverse' : dir === 'alternate' ? 'alternate' : 'normal',
+      iterations: iterations,
+      fill: iterations === Infinity ? 'none' : 'forwards'
+    };
+  }
+
+  function playSpec(el: Element | string | null, spec: TimedSpec | null | undefined, opts?: PlayOptions): Animation | null {
+    el = toEl(el); if (!el || !spec || !spec.keyframes || !spec.keyframes.length) return null;
+    if (reduceMotion()) return null;
+    opts = opts || {};
+    var restore = spec.origin && (el as HTMLElement).style ? setInline(el, 'transformOrigin', spec.origin) : null;
+    var anim = el.animate(spec.keyframes, timing(spec, opts));
+    return track(restore ? onCancel(anim, restore) : anim);
+  }
+
+  // The SVG's animatable layers (illustration groups / paths), for child-targeting.
+  function childLayers(el: Element): NodeListOf<Element> | HTMLCollection {
+    var n = el.querySelectorAll('[data-layer]');
+    if (n.length) return n;
+    n = el.querySelectorAll(':scope > g, :scope > path');
+    return n.length ? n : el.children;
+  }
+
+  // One function running every undo in `list`. A helper, so each child's closure gets its own
+  // list rather than the loop's last one (`var` is function-scoped).
+  function undoAll(list: Array<() => void>): () => void {
+    return function () { list.forEach(function (u) { u(); }); };
+  }
+
+  // Staggered per-child animation — the illustration families (Reveal/Cascade/…).
+  function playChildren(el: Element, spec: MotionSpec, opts?: PlayOptions): Animation | null {
+    opts = opts || {};
+    var kids = childLayers(el);
+    if (!kids || !kids.length) return playSpec(el, spec, opts);
+    var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 90);
+    var made: Animation[] = [];
+    for (var i = 0; i < kids.length; i++) {
+      var kid = kids[i]!, undo: Array<() => void> = [];
+      var styled = !!(kid as HTMLElement).style;
+      if (spec.origin && styled) undo.push(setInline(kid, 'transformOrigin', spec.origin));
+      // An SVG child transforms around its own bounding box, not the viewport's origin, so a
+      // scale or rotate stays on the layer it animates (M-13).
+      if (styled && (kid as SVGElement).ownerSVGElement !== undefined) undo.push(setInline(kid, 'transformBox', 'fill-box'));
+      var anim = kid.animate(spec.keyframes, timing(spec, opts, i * stagger));
+      made.push(undo.length ? onCancel(anim, undoAll(undo)) : anim);
+    }
+    return track(groupHandle(made));
+  }
+
+  // Real "Draw": measure each child path and animate its stroke-dashoffset to 0.
+  function drawPaths(el: Element, spec: MotionSpec, opts?: PlayOptions): Animation | null {
+    opts = opts || {};
+    var paths = el.querySelectorAll<SVGGeometryElement>('path, line, polyline, polygon, circle, rect');
+    if (!paths.length) return playSpec(el, spec, opts);
+    var stagger = opts.stagger != null ? opts.stagger : (spec.stagger != null ? spec.stagger : 120);
+    var made: Animation[] = [], drawn = 0;
+    for (var i = 0; i < paths.length; i++) {
+      var p = paths[i]!, len = 0;
+      try { len = p.getTotalLength ? p.getTotalLength() : 0; } catch (e) { len = 0; }
+      if (!len) continue;
+      var undoArray = setInline(p, 'strokeDasharray', String(len));
+      var undoOffset = setInline(p, 'strokeDashoffset', String(len));
+      made.push(onCancel(
+        p.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], timing(spec, opts, drawn++ * stagger)),
+        undoAll([undoOffset, undoArray])
+      ));
+    }
+    return track(groupHandle(made));
+  }
+
+  function play(el: Element | string, presetId: string, opts?: PlayOptions): Animation | null {
+    var spec = PRESETS[presetId];
+    if (!spec) { return null; }
+    var node = toEl(el); if (!node) return null;
+    if (reduceMotion()) return null;
+    if (spec.draw) return drawPaths(node, spec, opts || {});
+    if (spec.perChild) return playChildren(node, spec, opts || {});
+    return playSpec(node, spec, opts);
+  }
+
+  // route by content: preset id | our JSON | bodymovin JSON (via Lottie tier)
+  function animate(el: Element | string, source: string | MotionSpec | PlaySpec | LottieJSON, opts?: PlayOptions): Animation | null {
+    if (typeof source === 'string') return play(el, source, opts);
+    if (source && (source as LottieJSON).layers && (source as LottieJSON).v && (source as LottieJSON).ip != null) return runLottie(el, source as LottieJSON, opts);
+    return playSpec(el, source as PlaySpec, opts); // our JSON schema
+  }
+
+  function runLottie(el: Element | string, json: LottieJSON, opts?: PlayOptions): Animation | null {
+    if (CONFIG.lottie === 'import' && (window as LottieGlobals).IchavaMotionLottie) {
+      var spec = (window as LottieGlobals).IchavaMotionLottie!.toSpec(json);
+      if (spec) return playSpec(el, spec, opts);
+    }
+    if (CONFIG.lottie === 'full') { return loadLottieWeb(toEl(el), json); }
+    if ((window as LottieGlobals).IchavaMotionLottie) { var s = (window as LottieGlobals).IchavaMotionLottie!.toSpec(json); if (s) return playSpec(el, s, opts); }
+    return null; // lottie disabled
+  }
+
+  /*
+   * The Lottie player is SUPPLIED, never fetched.
+   *
+   * This used to append a <script src="https://cdn.jsdelivr.net/..."> to the head
+   * on first use. Three things were wrong with that, and the first is the one that
+   * matters:
+   *
+   *  1. It cannot run under a strict CSP. Any policy with `script-src 'self'`
+   *     blocks the injected tag, so the feature failed exactly where the library
+   *     claims to be safest. Being CSP-safe by construction is the whole of D1 in
+   *     PLAN.md, and a library that injects remote script cannot claim it.
+   *  2. It silently introduced a third-party origin into the consumer's page, at
+   *     an unpinned major version, with no SRI. A supply-chain change at that
+   *     origin executes in their page with their privileges.
+   *  3. It made the network a dependency of an animation call.
+   *
+   * So resolution is local only: an explicitly configured player, or a global the
+   * consumer loaded themselves. When neither exists we say so once, clearly, and
+   * do nothing -- an animation that does not play is a bug report; a page that
+   * quietly fetches a CDN is an incident.
+   */
+  var lottieWarned = false;
+  var lottieRiskWarned = false;
+
+  function resolveLottiePlayer(): LottiePlayer | null {
+    if (CONFIG.lottiePlayer) return CONFIG.lottiePlayer as LottiePlayer;
+    if (typeof window !== 'undefined' && (window as LottieGlobals).lottie) return (window as LottieGlobals).lottie!;
+    return null;
+  }
+
+  function loadLottieWeb(el: Element | null, json: LottieJSON): null {
+    if (!el) return null;
+
+    /*
+     * S11. The full lottie-web build runs `eval` on expression fields in the JSON, and this
+     * library's own premise is that JSON arrives from anywhere. So 'full' is inert until the
+     * host says, in a flag that names the risk, that its Lottie files are trusted.
+     */
+    if (!CONFIG.lottieFullAcknowledgeEvalRisk) {
+      if (!lottieRiskWarned) {
+        lottieRiskWarned = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[ichava-motion] lottie:"full" is disabled. The full lottie-web build evaluates ' +
+          'expressions in the animation JSON with eval, so untrusted JSON would run as code. ' +
+          'Use lottie:"import" or lottie_light for untrusted input, or, if every file is ' +
+          'yours, opt in with IchavaMotion.config({ lottieFullAcknowledgeEvalRisk: true }).'
+        );
+      }
+      return null;
+    }
+
+    var lottie = resolveLottiePlayer();
+
+    if (!lottie) {
+      if (!lottieWarned) {
+        lottieWarned = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[ichava-motion] lottie:"full" needs a lottie-web player, and this library ' +
+          'will not fetch one. Load lottie-web yourself (npm, or a <script> you control) ' +
+          'and either expose it as window.lottie or pass it in: ' +
+          'IchavaMotion.config({ lottiePlayer: lottie }).'
+        );
+      }
+      return null;
+    }
+
+    lottie.loadAnimation({ container: el, renderer: 'svg', loop: true, autoplay: true, animationData: json });
+    return null;
+  }
+
+  /* ─── declarative auto-init (data-*) ─────────────────────────────────────── */
+  /*
+   * One parser for every numeric data-motion-* attribute (M6). The bare parseFloat this
+   * replaces let NaN and out-of-range values straight into WAAPI timing, where animate()
+   * throws a TypeError for them, and the whole wire() call died with it. A bad value now
+   * takes the default (undefined: the option is simply not set) and names the attribute
+   * once, so the markup can be fixed.
+   *
+   * The ranges are exactly what WAAPI and timing() accept, no narrower: a value that
+   * played before still plays. A negative delay is valid WAAPI (it starts part-way
+   * through), and timing() clamps any speed, so only NaN is refused for those.
+   */
+  function num(attr: string, v: string, fallback: number | undefined, min: number, max: number): number | undefined {
+    var n = parseFloat(v);
+    if (n === n && n >= min && n <= max) return n; // n === n is false only for NaN
+    // eslint-disable-next-line no-console
+    console.warn('[ichava-motion] ' + attr + '="' + v + '" is not a number in [' + min + ', ' + max + ']; using the default.');
+    return fallback;
+  }
+  var F = Number.MAX_VALUE; // finite: WAAPI's delay must be
+  function readOpts(el: HTMLElement): PlayOptions {
+    var d = el.dataset;
+    var o: PlayOptions = {};
+    var x: number | undefined;
+    if (d.motionSpeed && (x = num('data-motion-speed', d.motionSpeed, undefined, -Infinity, Infinity)) !== undefined) o.speed = x;
+    if (d.motionDuration && (x = num('data-motion-duration', d.motionDuration, undefined, 0, Infinity)) !== undefined) o.duration = x;
+    if (d.motionEasing) o.easing = d.motionEasing;
+    if (d.motionDelay && (x = num('data-motion-delay', d.motionDelay, undefined, -F, F)) !== undefined) o.delay = x;
+    if (d.motionDirection) o.direction = d.motionDirection as Direction;
+    if (d.motionIterations) {
+      if (d.motionIterations === 'infinite') o.iterations = Infinity;
+      else if ((x = num('data-motion-iterations', d.motionIterations, undefined, 0, Infinity)) !== undefined) o.iterations = x;
+    }
+    if (d.motionStagger && (x = num('data-motion-stagger', d.motionStagger, undefined, -F, F)) !== undefined) o.stagger = x;
+    return o;
+  }
+
+  /*
+   * Wired element -> the function that unwires it (M4). A WeakMap, not the Map the design
+   * sketched: a Map holds every element ever wired, so a single-page app that removes nodes
+   * without calling unwire() would leak them, which the WeakSet this replaces never did.
+   * unwire(root) finds its elements by querying root, so nothing needs to iterate this.
+   */
+  var WIRED = new WeakMap<Element, () => void>();
+  function wire(el: Element): void {
+    if (WIRED.has(el)) return;
+    var offs: Array<() => void> = [];
+    var id = el.getAttribute('data-ichava-motion') as string;
+    var trigger = el.getAttribute('data-motion-trigger') || CONFIG.defaults.trigger || 'load';
+    var opts = readOpts(el as HTMLElement);
+    var current: Animation | null = null;
+    function start(o?: PlayOptions) { if (current) current.cancel(); current = play(el, id, o || opts); return current; }
+    function on(type: string, fn: () => void) {
+      el.addEventListener(type, fn);
+      offs.push(function () { el.removeEventListener(type, fn); });
+    }
+    offs.push(function () { if (current) current.cancel(); current = null; });
+    WIRED.set(el, function () { offs.forEach(function (f) { f(); }); });
+    if (trigger === 'load') { start(); }
+    else if (trigger === 'loop') { start({ iterations: Infinity }); }
+    else if (trigger === 'hover') {
+      on('mouseenter', function () { start(); });
+      on('mouseleave', function () { if (current) current.cancel(); });
+    } else if (trigger === 'click') {
+      on('click', function () { if (current && current.playState === 'running') current.cancel(); else start(); });
+    } else if (trigger === 'visible') {
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) { entries.forEach(function (e) { if (e.isIntersecting) { start({ iterations: PRESETS[id] && PRESETS[id]!.once ? 1 : opts.iterations }); io.unobserve(el); } }); });
+        io.observe(el);
+        offs.push(function () { io.disconnect(); });
+      } else start();
+    }
+  }
+
+  function unwireOne(el: Element): void {
+    var off = WIRED.get(el);
+    if (!off) return;
+    WIRED.delete(el);
+    off();
+  }
+  function unwire(root?: ParentNode): void {
+    var r = root || document;
+    unwireOne(r as Element);
+    r.querySelectorAll('[data-ichava-motion]').forEach(unwireOne);
+  }
+
+  // Wire nodes added under root later; unwire wired nodes taken out of it (M4).
+  function observe(root: ParentNode): void {
+    if (typeof MutationObserver === 'undefined') return;
+    var mo = new MutationObserver(function (records) {
+      records.forEach(function (rec) {
+        rec.removedNodes.forEach(function (n) {
+          // A moved node is reported removed and then added; only a detached one is let go.
+          if (n.nodeType === 1 && !n.isConnected) unwire(n as Element);
+        });
+        rec.addedNodes.forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          if ((n as Element).hasAttribute('data-ichava-motion')) wire(n as Element);
+          (n as Element).querySelectorAll('[data-ichava-motion]').forEach(wire);
+        });
+      });
+    });
+    mo.observe(root as Node, { childList: true, subtree: true });
+    TEARDOWN.push(function () { mo.disconnect(); });
+  }
+
+  // A pause button the host renders; the engine only listens to it (M3, WCAG 2.2.2).
+  function bindPauseControl(target: Element | string): void {
+    var btn = toEl(target);
+    if (!btn) return;
+    var paused = false;
+    btn.setAttribute('aria-pressed', 'false');
+    var onClick = function () {
+      paused = !paused;
+      if (paused) pauseAll(); else resumeAll();
+      btn!.setAttribute('aria-pressed', String(paused));
+    };
+    btn.addEventListener('click', onClick);
+    TEARDOWN.push(function () { btn!.removeEventListener('click', onClick); });
+  }
+
+  function auto(rootOrOptions?: ParentNode | AutoOptions, options?: AutoOptions): void {
+    var root: ParentNode, o: AutoOptions;
+    if (rootOrOptions && typeof (rootOrOptions as ParentNode).querySelectorAll === 'function') {
+      root = rootOrOptions as ParentNode; o = options || {};
+    } else {
+      root = document; o = (rootOrOptions as AutoOptions) || options || {};
+    }
+    root.querySelectorAll('[data-ichava-motion]').forEach(wire);
+    if (o.observe) observe(root);
+    if (o.pauseControl) bindPauseControl(o.pauseControl);
+  }
+
+  function destroy(): void {
+    if (typeof document !== 'undefined') unwire(document);
+    stopAll();
+    var undo = TEARDOWN; TEARDOWN = [];
+    undo.forEach(function (f) { f(); });
+  }
+
+  /* ─── public API ─────────────────────────────────────────────────────────── */
+  var IchavaMotion = {
+    version: VERSION,
+    config: function (o) { assign(CONFIG, o || {}); return this; },
+    animate: animate,
+    play: play,
+    playSpec: playSpec,
+    // Play a JSON def ({ keyframes, duration, easing, direction, iterations }). The
+    // detail dialog's Motion tab exports exactly this shape. `{ trigger:'loop' }` loops.
+    fromJSON: function (el, def, opts) { opts = opts || {}; if (opts.trigger === 'loop') opts.iterations = Infinity; return playSpec(el, def, opts); },
+    auto: auto,
+    unwire: unwire,
+    destroy: destroy,
+    pauseAll: function () { pauseAll(); return this; },
+    resumeAll: function () { resumeAll(); return this; },
+    stopAll: function () { stopAll(); return this; },
+    presets: function () { return PRESETS; },
+    presetIds: function () { return Object.keys(PRESETS); },
+    easings: function () { return assign({}, EASINGS); },
+    register: function (id, spec) { PRESETS[id] = assign({ id: id, keyframes: [], base: 1000, iterations: Infinity, direction: 'normal' }, spec); return this; },
+    registerFamily: function (family) { FAMILIES.push(family); buildPresets(); return this; },
+    registerVariant: function (variant) { VARIANTS.push(variant); buildPresets(); return this; },
+    registerEasing: function (name, value) { EASINGS[name] = value; return this; },
+    create: function () { return createMotion(); },
+    catalog: function () {
+      return { families: FAMILIES.map(function (f) { return assign({}, f); }), variants: VARIANTS.map(function (v) { return assign({}, v); }) };
+    }
+  } as IchavaMotionApi;
+
+  /*
+   * Auto-scan is OPT-IN.
+   *
+   * It used to run on DOMContentLoaded unless `window.__ichavaMotionNoAuto` was set --
+   * opt-out, so simply loading the script started animation the user never asked for. WCAG
+   * 2.2.2 requires motion that starts automatically and lasts more than five seconds to be
+   * pausable, stoppable or hideable, and the presets here loop indefinitely. Defaulting to
+   * off means a page opts in deliberately, and `autoInit()` is there for the `<script>` tag
+   * users who want the old behaviour:
+   *
+   *   <script src="ichava-motion.js"></script>
+   *   <script>IchavaMotion.autoInit()</script>
+   *
+   * `prefersReduced()` is still honoured inside `auto()`, so even an explicit opt-in does
+   * nothing for a user who asked for less motion.
+   */
+  IchavaMotion.autoInit = function autoInit(options?: AutoOptions): IchavaMotionApi {
+    if (typeof document === 'undefined') return IchavaMotion;
+    var o = options || {};
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { auto(o); });
+    } else {
+      auto(o);
+    }
+    return IchavaMotion;
+  };
+
+  return IchavaMotion;
+}
+
+/** The default instance: the module's default export and the `<script>` global. */
+var IchavaMotion = createMotion();
+
+/*
+ * The global is for the `<script>` build only, and is assigned defensively so importing
+ * this module in Node does not throw.
+ */
+if (typeof globalThis !== 'undefined' && typeof globalThis.document !== 'undefined') {
+  (globalThis as typeof globalThis & { IchavaMotion?: IchavaMotionApi }).IchavaMotion = IchavaMotion;
+}
+
+/*
+ * Default export only, deliberately.
+ *
+ * Adding a named export alongside it makes Rollup emit a namespace object as the IIFE
+ * global, so `IchavaMotion.animate` becomes `IchavaMotion.default.animate` and every
+ * `<script>` consumer and published CDN URL breaks. A single default export lets the IIFE
+ * assign the library itself, which is the contract those users already have.
+ */
+export default IchavaMotion;

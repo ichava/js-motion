@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/architecture.md` names the browser and landing that use the engine: icon-browser and ichava.com, since react-icon-browser and react-landingpage were folded into them. The comment in `src/ichava-motion.ts` that names react-icon-browser is left, because changing it would change the committed `dist/` source maps.
+
 ## [0.1.0] - 2026-11-13
 
 First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.

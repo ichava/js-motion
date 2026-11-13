@@ -41,8 +41,9 @@ which is exactly why it is a separate entry point rather than an import in the c
 ## Why it is framework-agnostic
 
 The engine operates on SVG elements in the DOM. It does not know or care whether Vue, React, Blade
-or a static file put them there, which is what lets the same package serve `ichava/icon-browser`'s Vue
-SPA and `@ichava/react-icon-browser` without a wrapper for each.
+or a static file put them there, which is what lets the same package serve `ichava/icon-browser`'s
+React browser (its source in `resources/js` since 2026-11-12, when react-icon-browser was folded
+into it) and ichava.com's landing without a wrapper for each.
 
 ---
 

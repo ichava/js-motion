@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ichava Motion — demo (no framework)</title>
+    <link rel="stylesheet" href="../dist/ichava-motion.css" />
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 32px; background: #0a0a0b; color: #fafafa; }
+      h1 { font-size: 18px; } h2 { font-size: 13px; color: #a1a1aa; margin-top: 28px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+      .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 1px solid #26262b; border-radius: 10px; }
+      .cell span { font-size: 11px; color: #a1a1aa; }
+      svg { width: 34px; height: 34px; color: #8b5cf6; }
+      select, button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #26262b; background: #131316; color: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <h1>Ichava Motion — standalone, no framework, no bundler</h1>
+
+    <h2>1 · CSS-only (no JS needed) — class <code>.ichm-*</code></h2>
+    <div class="grid">
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ichm-spin"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg><span>.ichm-spin</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ichm-pulse"><circle cx="12" cy="12" r="9"/></svg><span>.ichm-pulse</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ichm-heartbeat"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg><span>.ichm-heartbeat</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ichm-bounce"><path d="M12 3v18M5 10l7-7 7 7"/></svg><span>.ichm-bounce</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ichm-swing"><path d="M12 2v6m0 0a4 4 0 1 0 0 8"/></svg><span>.ichm-swing</span></div>
+    </div>
+
+    <h2>2 · Declarative JS — <code>data-ichava-motion</code> + triggers</h2>
+    <div class="grid">
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-ichava-motion="spin-bold" data-motion-trigger="hover"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg><span>spin-bold · hover</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-ichava-motion="tada" data-motion-trigger="click"><path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.4-6.3-4.6L5.7 21 8 13.8 2 9.4h7.6z"/></svg><span>tada · click</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-ichava-motion="wiggle" data-motion-trigger="loop"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg><span>wiggle · loop</span></div>
+      <div class="cell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-ichava-motion="zoom-in" data-motion-trigger="visible"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span>zoom-in · visible</span></div>
+    </div>
+
+    <h2>3 · Imperative — <code>IchavaMotion.play()</code> / custom JSON</h2>
+    <div class="cell" style="max-width:280px">
+      <svg id="target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 0a4 4 0 1 0 0 8"/></svg>
+      <select id="preset"></select>
+      <button id="play">Play</button>
+      <button id="custom">Custom JSON (spin+scale)</button>
+    </div>
+
+    <h2>4 · Illustrations — layered SVG, child stagger (<code>data-layer</code>)</h2>
+    <div class="grid">
+      <div class="cell">
+        <svg viewBox="0 0 120 120" style="width:64px;height:64px" data-ichava-motion="reveal" data-motion-trigger="loop" data-motion-stagger="120">
+          <g data-layer><circle cx="20" cy="24" r="2.5" fill="#f59e0b"/><circle cx="98" cy="30" r="3" fill="#ec4899"/><circle cx="86" cy="86" r="2.5" fill="#2563eb"/></g>
+          <g data-layer><path fill="#2563eb" d="M60 18c10 6 16 18 16 32l-6 12H50l-6-12c0-14 6-26 16-32z"/><circle cx="60" cy="44" r="6" fill="#fff"/></g>
+          <g data-layer><path fill="#e11d48" d="M50 62l-6 20 8-6 8 8 8-8 8 6-6-20z"/></g>
+        </svg>
+        <span>reveal · loop (layers stagger)</span>
+      </div>
+      <div class="cell">
+        <svg viewBox="0 0 120 120" style="width:64px;height:64px" data-ichava-motion="draw" data-motion-trigger="loop" data-motion-stagger="150">
+          <circle cx="60" cy="60" r="34" fill="none" stroke="#059669" stroke-width="6"/>
+          <path fill="none" stroke="#059669" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" d="M46 60l10 12 20-24"/>
+        </svg>
+        <span>draw · loop (per-path)</span>
+      </div>
+    </div>
+
+    <script src="../dist/ichava-motion.js"></script>
+    <script>
+      var sel = document.getElementById('preset');
+      IchavaMotion.presetIds().forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = id; sel.appendChild(o); });
+      var anim = null;
+      document.getElementById('play').onclick = function () { if (anim) anim.cancel(); anim = IchavaMotion.play('#target', sel.value, { speed: 1, iterations: 3 }); };
+      document.getElementById('custom').onclick = function () {
+        if (anim) anim.cancel();
+        anim = IchavaMotion.animate('#target', { keyframes: [{ transform: 'rotate(0) scale(1)' }, { transform: 'rotate(180deg) scale(1.4)' }, { transform: 'rotate(360deg) scale(1)' }], duration: 1200, easing: 'ease-in-out', iterations: 2 });
+      };
+    </script>
+  </body>
+</html>

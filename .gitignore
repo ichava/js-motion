@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+
+# Lock files are never committed in a library.
+package-lock.json

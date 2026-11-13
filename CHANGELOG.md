@@ -64,7 +64,7 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
   Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change
   for any host already using `'full'`: add the flag if every Lottie file you play is trusted.
 
-## [0.1.0] - TBD
+## [0.1.0] - 2026-11-13
 
 First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.
 

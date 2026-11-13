@@ -4,6 +4,10 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-13
+
+First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.
+
 ### Added
 
 - **Group handles seek, reverse and finish together** (motion plan M-12, M-13). The handle `play()` returns for a group family gains `seek(ms)`, which sets every child's `currentTime` to the same timeline time so the stagger is kept, and fans `reverse()` out to every child. Its `finished` resolves to the handle once every child has finished, where it used to be the last child's alone. `GroupAnimation` types both. `tests/group-handle.test.mjs` was written first and failed on each.
@@ -36,10 +40,23 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
 - `release.yml` can be dispatched by hand against a tag, as a recovery path when a tag push starts
   nothing. A first step refuses any ref that is not a `vX.Y.Z` tag.
 
+- The animation engine as ESM, CommonJS and an IIFE global with generated TypeScript declarations, the CSS-only tier (`@ichava/js-motion/css`, the Sass source at `/scss`), the preset manifest (`/presets`) and the opt-in Lottie adapter (`/lottie`).
+- 240 presets across 40 families, `data-*` declarative wiring through the opt-in `autoInit()`, `IchavaMotion.create()` for independent engines and `IchavaMotion.catalog()` for building a picker.
+
 ### Changed
 
 - **Documentation links point at each repository's own `docs/`** (Sim, 2026-11-03: "all ichava repos have docs in their respective repos. thats by design"). Links to `opensource.simtabi.com/documentation/ichava/...` and the `opensource.simtabi.com/products/ichava/...` homepage, which answer 404 for every ichava page, now go to the matching `docs/*.md` on GitHub, or to the repository itself. Each target was checked to exist on that repository's `main`. The manifest's `homepage` and `support.docs` follow.
 - **The author and contact address is `ichava@simtabi.com`** (W-11, Sim 2026-11-03), replacing the community address `opensource@simtabi.com` wherever this repository named it. Vulnerability reports still go to `security@simtabi.com`.
+
+- **BREAKING: the `spin-z` family is renamed `spin-tilt`, label "Spin Tilt"** (release 0.1.0 finding M-16, audit M25). It rotates about Z with a fixed `rotateX(20deg)` tilt, so `spin-z` misdescribed it and read as a duplicate of `spin`, which already rotates about Z. Every id moves (`spin-tilt`, `spin-tilt-reverse`, `spin-tilt-subtle`, `spin-tilt-subtlereverse`, `spin-tilt-bold`, `spin-tilt-boldreverse`), as does the `family` field in `dist/presets.json`; the CSS tier never carried this family. There is no alias: a `data-ichava-motion` attribute or saved setting that names a `spin-z` id no longer resolves to a preset and falls back to the default (no animation) until it is changed to the `spin-tilt` id. `tests/spin-tilt-rename.test.mjs` fails if `spin-z` reappears under `src/`, `dist/`, `docs/`, `demo/` or `scripts/`, and checks the engine and the manifest both carry the six `spin-tilt` ids.
+- CI tests on Node 24 and 26 (the newest release), up from 22 and 24, and the single-version jobs and the release run on 24, the active LTS.
+- **CI fails when the committed `dist/` is not what the build produces** (release 0.1.0 finding XR-7). The `Build does not destroy committed output` job already compared the CSS, the JS bundles and the declarations; it now compares every file under `dist/` (source maps, the Lottie entry and `presets.json` included) and fails on a file the build creates that is not committed. Its stale comment, which still called the job an expected failure, now says what it guards.
+- **`dist/presets.json` reports `count: 240`, the number of presets it lists**, instead of 242 (release 0.1.0 finding M-15). The two picker sentinels that inflated it, `None` and `JSON · Custom`, are now listed under a new `sentinels` key. A consumer that read `count` as the picker size including the sentinels should add `sentinels.length`. `tests/presets-manifest.test.mjs` pins `count === presets.length` and that the manifest lists exactly the engine's preset ids; it fails on the old manifest.
+
+### Removed
+
+- **The `spin-z` preset family and its six ids** (`spin-z`, `spin-z-reverse`, `spin-z-subtle`, `spin-z-subtlereverse`, `spin-z-bold`, `spin-z-boldreverse`), with no forwarding alias. They are renamed to `spin-tilt`; see Changed.
+- **The deep-import shims `src/ichava-motion.js` and `src/ichava-motion.d.ts`**, deprecated in 0.1.1. They forwarded to `dist/` for a bundler that ignores the `exports` map; neither path was ever in `exports`. Import `@ichava/js-motion` instead. Their tests went with them, and `tests/package-surface.test.mjs` now fails if the `exports` map names anything outside `dist/` other than the Sass source, or if the packed tarball carries JavaScript or declarations under `src/`.
 
 ### Fixed
 
@@ -63,27 +80,6 @@ All notable changes to `@ichava/js-motion` (published as `@ichava/motion` before
   evaluates expression fields with `eval`, and this engine treats animation JSON as arriving from anywhere.
   Without the flag `'full'` warns once and plays nothing. The default stays `'off'`. This is a behaviour change
   for any host already using `'full'`: add the flag if every Lottie file you play is trusted.
-
-## [0.1.0] - 2026-11-13
-
-First release of `@ichava/js-motion`. The repository is published as a single commit; the 0.1.x tags cut on 2026-10-23 (v0.1.0 to v0.1.2) are folded into this release, and their notes are kept below under *Archived history*.
-
-### Added
-
-- The animation engine as ESM, CommonJS and an IIFE global with generated TypeScript declarations, the CSS-only tier (`@ichava/js-motion/css`, the Sass source at `/scss`), the preset manifest (`/presets`) and the opt-in Lottie adapter (`/lottie`).
-- 240 presets across 40 families, `data-*` declarative wiring through the opt-in `autoInit()`, `IchavaMotion.create()` for independent engines and `IchavaMotion.catalog()` for building a picker.
-
-### Removed
-
-- **The `spin-z` preset family and its six ids** (`spin-z`, `spin-z-reverse`, `spin-z-subtle`, `spin-z-subtlereverse`, `spin-z-bold`, `spin-z-boldreverse`), with no forwarding alias. They are renamed to `spin-tilt`; see Changed.
-- **The deep-import shims `src/ichava-motion.js` and `src/ichava-motion.d.ts`**, deprecated in 0.1.1. They forwarded to `dist/` for a bundler that ignores the `exports` map; neither path was ever in `exports`. Import `@ichava/js-motion` instead. Their tests went with them, and `tests/package-surface.test.mjs` now fails if the `exports` map names anything outside `dist/` other than the Sass source, or if the packed tarball carries JavaScript or declarations under `src/`.
-
-### Changed
-
-- **BREAKING: the `spin-z` family is renamed `spin-tilt`, label "Spin Tilt"** (release 0.1.0 finding M-16, audit M25). It rotates about Z with a fixed `rotateX(20deg)` tilt, so `spin-z` misdescribed it and read as a duplicate of `spin`, which already rotates about Z. Every id moves (`spin-tilt`, `spin-tilt-reverse`, `spin-tilt-subtle`, `spin-tilt-subtlereverse`, `spin-tilt-bold`, `spin-tilt-boldreverse`), as does the `family` field in `dist/presets.json`; the CSS tier never carried this family. There is no alias: a `data-ichava-motion` attribute or saved setting that names a `spin-z` id no longer resolves to a preset and falls back to the default (no animation) until it is changed to the `spin-tilt` id. `tests/spin-tilt-rename.test.mjs` fails if `spin-z` reappears under `src/`, `dist/`, `docs/`, `demo/` or `scripts/`, and checks the engine and the manifest both carry the six `spin-tilt` ids.
-- CI tests on Node 24 and 26 (the newest release), up from 22 and 24, and the single-version jobs and the release run on 24, the active LTS.
-- **CI fails when the committed `dist/` is not what the build produces** (release 0.1.0 finding XR-7). The `Build does not destroy committed output` job already compared the CSS, the JS bundles and the declarations; it now compares every file under `dist/` (source maps, the Lottie entry and `presets.json` included) and fails on a file the build creates that is not committed. Its stale comment, which still called the job an expected failure, now says what it guards.
-- **`dist/presets.json` reports `count: 240`, the number of presets it lists**, instead of 242 (release 0.1.0 finding M-15). The two picker sentinels that inflated it, `None` and `JSON · Custom`, are now listed under a new `sentinels` key. A consumer that read `count` as the picker size including the sentinels should add `sentinels.length`. `tests/presets-manifest.test.mjs` pins `count === presets.length` and that the manifest lists exactly the engine's preset ids; it fails on the old manifest.
 
 ## [Archived history]
 
